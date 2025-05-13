@@ -1,0 +1,6 @@
+config:
+  envConfig:
+    test:
+      caches:
+        - name: test-cache
+        - name: response-cache 

@@ -1,0 +1,90 @@
+{
+  "version": "1.0",
+  "envConfig": {
+    "pilot": {
+      "targetServers": [
+        {
+          "name": "npp-test-bank-qa",
+          "host": "npptb-qa-idmz.npptestbank-idmz.qa.cloud01-public.swift.com",
+          "isEnabled": true,
+          "port": 443,
+          "sSLInfo": {
+            "ciphers": [],
+            "clientAuthEnabled": "true",
+            "enabled": true,
+            "ignoreValidationErrors": true,
+            "keyAlias" : "ews_kyc_swift",
+            "keyStore" : "ref://SB-Client-Keystore-Ref",
+            "trustStore" : "ref://SB-Server-Truststore-Ref"
+          }
+        }
+      ],
+      "sharedFlows": [
+        {
+          "name": "default-error-handler",
+          "path": "./shared-flows/default-error-handler",
+          "deploy": true
+        }
+      ],
+      "kvms": [],
+      "flowHooks": [],
+      "caches": []
+    },
+    "dev": {
+      "targetServers": [
+        {
+          "name": "npp-test-bank-qa",
+          "host": "npptb-qa-idmz.npptestbank-idmz.qa.cloud01-public.swift.com",
+          "isEnabled": true,
+          "port": 443,
+          "sSLInfo": {
+            "ciphers": [],
+            "clientAuthEnabled": "true",
+            "enabled": true,
+            "ignoreValidationErrors": true,
+            "keyAlias" : "ews_kyc_swift",
+            "keyStore" : "ref://SB-Client-Keystore-Ref",
+            "trustStore" : "ref://SB-Server-Truststore-Ref"
+          }
+        }
+      ],
+      "sharedFlows": [
+        {
+          "name": "default-error-handler",
+          "path": "./shared-flows/default-error-handler",
+          "deploy": true
+        }
+      ],
+      "kvms": [],
+      "flowHooks": [],
+      "caches": []
+    },
+    "live": {
+      "targetServers": [],
+      "sharedFlows": [],
+      "kvms": [],
+      "flowHooks": [],
+      "caches": []
+    }
+  },
+  "orgConfig": {
+    "apiProducts": {
+      "test-product": {
+        "name": "test-product",
+        "displayName": "Test API Product",
+        "description": "API Product for testing",
+        "approvalType": "auto",
+        "attributes": [],
+        "environments": ["pilot"],
+        "proxies": ["npp-test-bank-qa-v1"],
+        "quota": "10000",
+        "quotaInterval": "1",
+        "quotaTimeUnit": "month"
+      }
+    },
+    "developers": {
+    },
+    "developerApps": {
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "envConfig": {
+    "test": {
+      "targetServers": [
+        {
+          "name": "test-server",
+          "host": "api.example.com",
+          "port": 443,
+          "isEnabled": true,
+          "sSLInfo": {
+            "enabled": true,
+            "clientAuthEnabled": "true",
+            "keyStore": "ref://test-keystore",
+            "trustStore": "ref://test-truststore",
+            "keyAlias": "test-key",
+            "ignoreValidationErrors": false,
+            "ciphers": ["TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"]
+          }
+        },
+        {
+          "name": "test-server-2",
+          "host": "api2.example.com",
+          "port": 8443,
+          "isEnabled": true,
+          "sSLInfo": {
+            "enabled": false
+          }
+        }
+      ]
+    }
+  }
+} 

@@ -1,0 +1,16 @@
+config:
+  products: []
+  developerApps: []
+  envConfig:
+    test:
+      proxies: []
+      sharedFlows: []
+      kvms: []
+      targetServers: []
+      caches: []
+    prod:
+      proxies: []
+      sharedFlows: []
+      kvms: []
+      targetServers: []
+      caches: [] 

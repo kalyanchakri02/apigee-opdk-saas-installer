@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "envConfig": {
+    "test": {
+      "caches": [
+        {
+          "name": "test-cache",
+          "description": "Test cache for API responses",
+          "expirySettings": {
+            "timeoutInSec": {
+              "value": 3600
+            },
+            "valuesNull": false
+          },
+          "overflowToDisk": true,
+          "skipCacheIfElementSizeInKBExceeds": "512",
+          "maxElementsInMemory": 1000,
+          "maxElementsOnDisk": 1000000,
+          "persistent": false
+        },
+        {
+          "name": "response-cache",
+          "description": "Cache for general API responses",
+          "expirySettings": {
+            "timeoutInSec": {
+              "value": 1800
+            },
+            "valuesNull": false
+          },
+          "overflowToDisk": false,
+          "skipCacheIfElementSizeInKBExceeds": "256",
+          "maxElementsInMemory": 500,
+          "persistent": false
+        }
+      ]
+    }
+  }
+} 

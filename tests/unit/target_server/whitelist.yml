@@ -1,0 +1,6 @@
+config:
+  envConfig:
+    test:
+      targetServers:
+        - name: test-server
+        - name: test-server-2 

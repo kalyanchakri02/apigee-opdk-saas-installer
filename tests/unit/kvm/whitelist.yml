@@ -1,0 +1,6 @@
+config:
+  envConfig:
+    test:
+      kvms:
+        - name: test-kvm
+        - name: config-kvm 

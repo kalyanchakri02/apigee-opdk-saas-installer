@@ -1,0 +1,21 @@
+config:
+  products:
+    - name: example-product
+  developers:
+    - email: developer@example.com
+  developerApps:
+    - name: example-app
+  envConfig:
+    test:
+      proxies:
+        - name: example-api
+          deploy: true
+      sharedFlows:
+        - name: error-handler
+          deploy: true
+      kvms:
+        - name: config
+      targetServers:
+        - name: example-target
+      caches:
+        - name: token-cache 
