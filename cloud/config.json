@@ -3,21 +3,6 @@
   "envConfig": {
     "pilot": {
       "targetServers": [
-        {
-          "name": "npp-test-bank-qa",
-          "host": "npptb-qa-idmz.npptestbank-idmz.qa.cloud01-public.swift.com",
-          "isEnabled": true,
-          "port": 443,
-          "sSLInfo": {
-            "ciphers": [],
-            "clientAuthEnabled": "true",
-            "enabled": true,
-            "ignoreValidationErrors": true,
-            "keyAlias" : "ews_kyc_swift",
-            "keyStore" : "ref://SB-Client-Keystore-Ref",
-            "trustStore" : "ref://SB-Server-Truststore-Ref"
-          }
-        }
       ],
       "sharedFlows": [
         {
@@ -32,21 +17,6 @@
     },
     "dev": {
       "targetServers": [
-        {
-          "name": "npp-test-bank-qa",
-          "host": "npptb-qa-idmz.npptestbank-idmz.qa.cloud01-public.swift.com",
-          "isEnabled": true,
-          "port": 443,
-          "sSLInfo": {
-            "ciphers": [],
-            "clientAuthEnabled": "true",
-            "enabled": true,
-            "ignoreValidationErrors": true,
-            "keyAlias" : "ews_kyc_swift",
-            "keyStore" : "ref://SB-Client-Keystore-Ref",
-            "trustStore" : "ref://SB-Server-Truststore-Ref"
-          }
-        }
       ],
       "sharedFlows": [
         {
