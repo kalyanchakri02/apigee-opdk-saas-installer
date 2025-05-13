@@ -6,9 +6,7 @@
       ],
       "sharedFlows": [
         {
-          "name": "default-error-handler",
-          "path": "./shared-flows/default-error-handler",
-          "deploy": true
+          "name": "default-error-handler"
         }
       ],
       "kvms": [],
@@ -20,9 +18,7 @@
       ],
       "sharedFlows": [
         {
-          "name": "default-error-handler",
-          "path": "./shared-flows/default-error-handler",
-          "deploy": true
+          "name": "default-error-handler"
         }
       ],
       "kvms": [],
