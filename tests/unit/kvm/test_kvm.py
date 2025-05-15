@@ -25,7 +25,7 @@ def test_kvm_operations():
         
         # Test KVM apply (should create since it doesn't exist)
         logger.debug("Testing KVM creation")
-        assert kvm.apply() is None
+        assert kvm.apply() is True
         logger.info("KVM apply (create) handled correctly")
         
         # Test KVM apply with updates
@@ -34,7 +34,7 @@ def test_kvm_operations():
             "key1": "new_value1",
             "key3": "value3"
         }
-        assert kvm.apply() is None
+        assert kvm.apply() is True
         logger.info("KVM apply (update) handled correctly")
         
         logger.info("All KVM tests passed!")

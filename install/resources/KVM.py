@@ -45,7 +45,7 @@ class KVM(EnvConfigResource):
         entries = self.config.get('entries', [])
         for key, value in entries.items():
             payload = {"name":key,"value":value}
-            if self.exists(f'/keyvaluemaps/{self.name}/entries/{key}'):
+            if self._exists(f'/keyvaluemaps/{self.name}/entries/{key}'):
                 self.connection.post(f'/keyvaluemaps/{self.name}/entries/{key}',payload)
                 self.logger.info(f"Successfully updated entry {key} in KVM {self.name}")
             else:

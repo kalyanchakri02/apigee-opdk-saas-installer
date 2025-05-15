@@ -33,21 +33,9 @@ class Connection:
         """
         url = f"{self.base_url}/{endpoint}"
         logger.info(f"GET request to {url}")
-        try:
-            response = requests.get(url, headers=self.headers)
-            response.raise_for_status()
-            logger.info(f"Response: {response.json()}, status_code {response.status_code}")
-            if response.status_code != 200:
-                logger.error(f"Could not fetch information. Server returned error {response.status_code}")
-                logger.error(f"Error details: {response.text}")
-                return None
-            return response
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error occurred: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Connection problem while fetching information: {str(e)}")
-            return None
+        response = requests.get(url, headers=self.headers)
+        logger.info(f"Response: {response.json()}, status_code {response.status_code}")
+        return response
 
     def post(self, endpoint, data):
         """
@@ -58,18 +46,10 @@ class Connection:
         """
         url = f"{self.base_url}/{endpoint}"
         logger.info(f"POST request to {url}")
-        try:
-            response = requests.post(url, headers=self.headers, json=data)
-            logger.info(f"Response: {response.json()}")
-            if response.status_code not in [200, 201]:
-                logger.error(f"Could not create resource. Server returned error {response.status_code}")
-                logger.error(f"Error details: {response.text}")
-                return None
-            return response
-        except Exception as e:
-            logger.error(f"Connection problem while creating resource: {str(e)}")
-            return None
-
+        response = requests.post(url, headers=self.headers, json=data)
+        logger.info(f"Response: {response.json()}")
+        return response
+    
     def post_file(self, endpoint, files):
         """
         Perform a POST request with file upload to the given endpoint.
@@ -78,20 +58,12 @@ class Connection:
         :return: Response JSON from the API or None if request failed.
         """
         url = f"{self.base_url}/{endpoint}"
-        try:
-            # Create headers without Content-Type for file upload
-            headers = self.headers.copy()
-            headers.pop("Content-Type", None)
-            
-            response = requests.post(url, headers=headers, files=files)
-            if response.status_code not in  [200, 201]:
-                logger.error(f"Could not upload file. Server returned error {response.status_code}")
-                logger.error(f"Error details: {response.text}")
-                return None
-            return response
-        except Exception as e:
-            logger.error(f"Connection problem while uploading file: {str(e)}")
-            return None
+        logger.info(f"POST request to {url}")
+        headers = self.headers.copy()
+        headers.pop("Content-Type", None)
+        response = requests.post(url, headers=headers, files=files)
+        logger.info(f"Response: {response.json()}")
+        return response
 
     def put(self, endpoint, data):
         """
@@ -101,16 +73,10 @@ class Connection:
         :return: Response JSON from the API or None if request failed.
         """
         url = f"{self.base_url}/{endpoint}"
-        try:
-            response = requests.put(url, headers=self.headers, json=data)
-            if response.status_code != 200:
-                logger.error(f"Could not update resource. Server returned error {response.status_code}")
-                logger.error(f"Error details: {response.text}")
-                return None
-            return response
-        except Exception as e:
-            logger.error(f"Connection problem while updating resource: {str(e)}")
-            return None
+        logger.info(f"PUT request to {url}")
+        response = requests.put(url, headers=self.headers, json=data)
+        logger.info(f"Response: {response.json()}")
+        return response
 
     def delete(self, endpoint):
         """
@@ -119,13 +85,7 @@ class Connection:
         :return: Response JSON from the API or None if request failed.
         """
         url = f"{self.base_url}/{endpoint}"
-        try:
-            response = requests.delete(url, headers=self.headers)
-            if response.status_code != 200:
-                logger.error(f"Could not delete resource. Server returned error {response.status_code}")
-                logger.error(f"Error details: {response.text}")
-                return None
-            return response
-        except Exception as e:
-            logger.error(f"Connection problem while deleting resource: {str(e)}")
-            return None
+        logger.info(f"DELETE request to {url}")
+        response = requests.delete(url, headers=self.headers, json=data)
+        logger.info(f"Response: {response.json()}")
+        return response
