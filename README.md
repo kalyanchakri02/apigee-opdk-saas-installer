@@ -22,8 +22,8 @@ A Python framework for installing and managing Apigee resources across OnPrem an
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd apigee-installer
+git clone https://github.com/kalyanchakri02/apigee-opdk-saas-installer
+cd apigee-opdk-saas-installer
 ```
 
 2. Install dependencies:
