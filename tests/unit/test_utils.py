@@ -2,6 +2,7 @@ import getpass
 from install.setup.Connection import Connection
 import json
 import yaml
+import base64
 
 def get_test_config():
     """Get test configuration from user input."""
@@ -14,8 +15,8 @@ def get_test_config():
     instance = input("Instance type [cloud]: ") or "cloud"
     
     # Create base64 encoded credentials
-    credentials = f"{username}:{password}"
-    auth_header = f"Basic {credentials.encode('utf-8').b64encode().decode('utf-8')}"
+    credentials = f'{username}:{password}'
+    auth_header = f"Basic {base64.b64encode(credentials.encode()).decode('utf-8')}"
     
     return {
         "username": username,

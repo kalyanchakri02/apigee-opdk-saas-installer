@@ -15,9 +15,10 @@ class KVM(EnvConfigResource):
     def exists(self):
         """Check if KVM exists in the environment."""
         try:
-            response = self.connection.get(f'/v1/organizations/{self.connection.org}'
-                                        f'/environments/{self.connection.env}/keyvaluemaps/{self.name}')
-            return response.status_code == 200
+            response = self.connection.get(f'keyvaluemaps/{self.name}')
+            if response is None or response.status_code != 200:
+                return False
+            return True
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error checking if KVM {self.name} exists: {str(e)}")
             return False
@@ -30,8 +31,8 @@ class KVM(EnvConfigResource):
                 "encrypted": self.config.get('encrypted', False)
             }
             response = self.connection.post(
-                f'/v1/organizations/{self.connection.org}/environments/{self.connection.env}/keyvaluemaps',
-                json.dumps(payload)
+                f'keyvaluemaps',
+                payload
             )
             if response.status_code == 201:
                 self.logger.info(f"Successfully created KVM: {self.name}")
@@ -52,29 +53,47 @@ class KVM(EnvConfigResource):
             self.logger.error(f"Error updating KVM {self.name}: {str(e)}")
             return False
 
-    def _update_entries(self):
+    def _update_entries(self, encrypted=False):
         """Update the entries in the KVM."""
         entries = self.config.get('entries', {})
-        success = True
-        
-        for key, value in entries.items():
-            try:
-                payload = {"name": key, "value": value}
-                response = self.connection.post(
-                    f'/v1/organizations/{self.connection.org}/environments/{self.connection.env}'
-                    f'/keyvaluemaps/{self.name}/entries',
-                    json.dumps(payload)
-                )
-                if response.status_code not in [200, 201]:
-                    self.logger.error(f"Failed to update entry {key} in KVM {self.name}. Status: {response.status_code}")
-                    success = False
-                else:
-                    self.logger.info(f"Successfully updated entry {key} in KVM {self.name}")
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"Error updating entry {key} in KVM {self.name}: {str(e)}")
-                success = False
-        
-        return success
+        payload = {
+            "name" : self.name,
+            "entry":[
+                entries
+            ],
+            "encrypted" :  encrypted
+        }
+        try:
+            response = self.connection.post(
+                f'keyvaluemaps/{self.name}',
+                payload
+            )
+            if response.status_code not in [200, 201]:
+                self.logger.error(f"Failed to update entry {key} in KVM {self.name}. Status: {response.status_code}")
+            else:
+                self.logger.info(f"Successfully updated all entries in KVM {self.name}")
+                return True
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Error updating entry {key} in KVM {self.name}: {str(e)}")
+        return False
+    
+    def apply(self):
+        if self.exists():
+            self.logger.info(f"KVM {self.name} already exists, updating entries")
+            self.update()
+        else:
+            self.logger.info(f"KVM {self.name} does not exist, creating")
+            if self.create():
+                self.logger.info(f"Successfully created KVM {self.name}")
+                self.logger.info(f"Updating entries for KVM {self.name}")
+                self._update_entries()
+                self.logger.info(f"Successfully updated entries for KVM {self.name}")
+            else:
+                self.logger.error(f"Failed to create KVM {self.name}")
+                return False
+        return True
+
+
 
     def delete(self):
         """Delete the KVM from the environment."""
