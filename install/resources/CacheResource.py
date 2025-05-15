@@ -12,7 +12,7 @@ class CacheResource(EnvConfigResource):
         super().__init__(name, config, connection)
         self.logger = logging.getLogger(__name__)
 
-    def exists(self):
+    def _exists(self):
         """Check if Cache exists in the environment."""
         try:
             response = self.connection.get(f'/v1/organizations/{self.connection.org}'
@@ -22,7 +22,7 @@ class CacheResource(EnvConfigResource):
             self.logger.error(f"Error checking if Cache {self.name} exists: {str(e)}")
             return False
 
-    def create(self):
+    def _create(self):
         """Create a new Cache in the environment."""
         try:
             payload = {
@@ -56,7 +56,7 @@ class CacheResource(EnvConfigResource):
             self.logger.error(f"Error creating Cache {self.name}: {str(e)}")
             return False
 
-    def update(self):
+    def _update(self):
         """Update an existing Cache in the environment."""
         try:
             # For caches, we need to delete and recreate as there's no update API
@@ -69,7 +69,7 @@ class CacheResource(EnvConfigResource):
             self.logger.error(f"Error updating Cache {self.name}: {str(e)}")
             return False
 
-    def delete(self):
+    def _delete(self):
         """Delete the Cache from the environment."""
         try:
             response = self.connection.delete(
@@ -84,3 +84,11 @@ class CacheResource(EnvConfigResource):
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error deleting Cache {self.name}: {str(e)}")
             return False
+        
+    def apply(self):
+        if self.exists():
+            self.logger.info(f"Cache {self.name} already exists, updating")
+            return self.update()
+        else:
+            self.logger.info(f"Cache {self.name} does not exist, creating")
+            return self.create()

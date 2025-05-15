@@ -1,6 +1,5 @@
 from install.resources.EnvConfigResource import EnvConfigResource
 import logging
-import json
 import requests
 
 
@@ -12,78 +11,56 @@ class KVM(EnvConfigResource):
         super().__init__(name, config, connection)
         self.logger = logging.getLogger(__name__)
 
-    def exists(self):
-        """Check if KVM exists in the environment."""
-        try:
-            response = self.connection.get(f'keyvaluemaps/{self.name}')
-            if response is None or response.status_code != 200:
-                return False
+    def _exists(self, path):
+        """Check if KVM or KVM entry exists in the environment."""
+        response  = self.connection.get(path)
+        if response.status_code == 200:
             return True
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Error checking if KVM {self.name} exists: {str(e)}")
-            return False
-
-    def create(self):
-        """Create a new KVM in the environment."""
-        try:
-            payload = {
-                "name": self.name,
-                "encrypted": self.config.get('encrypted', False)
-            }
-            response = self.connection.post(
-                f'keyvaluemaps',
-                payload
-            )
-            if response.status_code == 201:
-                self.logger.info(f"Successfully created KVM: {self.name}")
-                self._update_entries()
-                return True
-            else:
-                self.logger.error(f"Failed to create KVM {self.name}. Status: {response.status_code}")
-                return False
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Error creating KVM {self.name}: {str(e)}")
-            return False
-
-    def update(self):
-        """Update an existing KVM in the environment."""
-        try:
-            return self._update_entries()
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Error updating KVM {self.name}: {str(e)}")
-            return False
-
-    def _update_entries(self, encrypted=False):
-        """Update the entries in the KVM."""
-        entries = self.config.get('entries', {})
-        payload = {
-            "name" : self.name,
-            "entry":[
-                entries
-            ],
-            "encrypted" :  encrypted
-        }
-        try:
-            response = self.connection.post(
-                f'keyvaluemaps/{self.name}',
-                payload
-            )
-            if response.status_code not in [200, 201]:
-                self.logger.error(f"Failed to update entry {key} in KVM {self.name}. Status: {response.status_code}")
-            else:
-                self.logger.info(f"Successfully updated all entries in KVM {self.name}")
-                return True
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Error updating entry {key} in KVM {self.name}: {str(e)}")
         return False
-    
+
+    def _create(self):
+        """Create a new KVM in the environment."""
+        payload = {
+            "name": self.name,
+            "encrypted": self.config.get('encrypted', False)
+        }
+        response = self.connection.post(
+            f'keyvaluemaps',
+            payload
+        )
+        if response.status_code == 201:
+            self.logger.info(f"Successfully created KVM: {self.name}")
+            self._update_entries()
+            return True
+        else:
+            self.logger.error(f"Failed to create KVM {self.name}. Status: {response.status_code}")
+            return False
+
+    def _update(self):
+        """Update an existing KVM in the environment."""
+        return self._update_entries()
+
+    def _update_entries(self):
+        """Update the entries in the KVM."""
+        entries = self.config.get('entries', [])
+        for key, value in entries.items():
+            payload = {"name":key,"value":value}
+            if self.exists(f'/keyvaluemaps/{self.name}/entries/{key}'):
+                self.connection.post(f'/keyvaluemaps/{self.name}/entries/{key}',payload)
+                self.logger.info(f"Successfully updated entry {key} in KVM {self.name}")
+            else:
+                self.logger.info(f"Entry {key} does not exist in KVM {self.name}, creating")
+                self.connection.post(f'/keyvaluemaps/{self.name}/entries', payload)
+
+
+
     def apply(self):
-        if self.exists():
+        if self._exists(f'keyvaluemaps/{self.name}'):
             self.logger.info(f"KVM {self.name} already exists, updating entries")
-            self.update()
+            self._update()
         else:
             self.logger.info(f"KVM {self.name} does not exist, creating")
-            if self.create():
+            if self._create():
                 self.logger.info(f"Successfully created KVM {self.name}")
                 self.logger.info(f"Updating entries for KVM {self.name}")
                 self._update_entries()
