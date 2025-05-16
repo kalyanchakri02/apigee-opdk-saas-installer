@@ -1,5 +1,5 @@
 # resources/Proxy.py
-from install.resources.EnvConfigResource import EnvConfigResource
+from install.resources.DeployableResource import DeployableResource
 from install.setup.Connection import Connection
 from install.setup.Zipper import Zipper
 from install.setup.logger_config import setup_logger, log_separator, log_file_separator
@@ -7,8 +7,11 @@ import os
 
 logger = setup_logger('Proxy')
 
-class Proxy(EnvConfigResource):
+class Proxy(DeployableResource):
+    """Class to manage API Proxies in Apigee."""
+
     def __init__(self, name: str, config: dict, connection: Connection, instance_type: str):
+        """Initialize Proxy with name, configuration and connection details."""
         super().__init__(name, config, connection)
         self.name = name
         self.config = config
@@ -18,82 +21,127 @@ class Proxy(EnvConfigResource):
         log_file_separator(logger, f"API Proxy '{name}'")
         logger.info(f"Starting to set up API proxy '{name}'")
 
+    def _exists(self):
+        """Check if API Proxy exists."""
+        response = self._make_request('get', f'apis/{self.name}')
+        return response is not None and response.status_code == 200
+
+    def _create(self):
+        """Create a new API Proxy."""
+        # First, create the proxy
+        payload = {
+            "name": self.name,
+            "basepaths": self.config.get('basepaths', []),
+            "description": self.config.get('description', '')
+        }
+        response = self._make_request('post', 'apis', data=payload)
+        
+        if not response or response.status_code != 201:
+            self.logger.error(f"Failed to create API Proxy {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
+
+        # Then, import the proxy bundle
+        bundle_path = self.config.get('bundlePath')
+        if not bundle_path or not os.path.exists(bundle_path):
+            self.logger.error(f"Bundle path not found: {bundle_path}")
+            return False
+
+        with open(bundle_path, 'rb') as bundle:
+            files = {'file': (os.path.basename(bundle_path), bundle, 'application/zip')}
+            response = self._make_request('post_file', f'apis/{self.name}/revisions/1', files=files)
+
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully created and imported API Proxy: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to import API Proxy bundle for {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
+
+    def _update(self):
+        """Update an existing API Proxy."""
+        # Import new revision
+        bundle_path = self.config.get('bundlePath')
+        if not bundle_path or not os.path.exists(bundle_path):
+            self.logger.error(f"Bundle path not found: {bundle_path}")
+            return False
+
+        # Get current revision
+        response = self._make_request('get', f'apis/{self.name}/revisions')
+        if not response or response.status_code != 200:
+            self.logger.error(f"Failed to get current revision for {self.name}")
+            return False
+
+        current_revision = len(response.json())
+        new_revision = current_revision + 1
+
+        # Import new revision
+        with open(bundle_path, 'rb') as bundle:
+            files = {'file': (os.path.basename(bundle_path), bundle, 'application/zip')}
+            response = self._make_request('post_file', f'apis/{self.name}/revisions/{new_revision}', files=files)
+
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully updated API Proxy: {self.name} to revision {new_revision}")
+            return True
+        else:
+            self.logger.error(f"Failed to update API Proxy {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
+
     def apply(self):
-        """Apply the proxy configuration and handle deployment."""
-        log_separator(logger, f"Setting up API proxy '{self.name}'")
-        try:
-            if self._exists():
-                logger.info(f"API proxy '{self.name}' exists, updating")
-                result = self._update()
-            else:
-                logger.info(f"API proxy '{self.name}' doesn't exist, creating")
-                result = self._create()
-            
-            # Handle deployment if needed
-            if result is not None and self.config.get("deploy", False):
-                logger.info(f"Deploying API proxy '{self.name}'")
-                return self._deploy()
-            return result
-            
-        except Exception as e:
-            logger.error(f"Problem setting up API proxy '{self.name}': {str(e)}")
-            return None
+        """Apply the API Proxy configuration."""
+        if self._exists():
+            self.logger.info(f"API Proxy {self.name} already exists, updating")
+            return self._update()
+        else:
+            self.logger.info(f"API Proxy {self.name} does not exist, creating")
+            return self._create()
+
+    def delete(self):
+        """Delete the API Proxy."""
+        response = self._make_request('delete', f'apis/{self.name}')
+        if response and response.status_code in [200, 204]:
+            self.logger.info(f"Successfully deleted API Proxy: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to delete API Proxy {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
+
+    def deploy(self, environment):
+        """Deploy the API Proxy to an environment."""
+        # Get latest revision
+        response = self._make_request('get', f'apis/{self.name}/revisions')
+        if not response or response.status_code != 200:
+            self.logger.error(f"Failed to get revisions for {self.name}")
+            return False
+
+        latest_revision = len(response.json())
+        
+        # Deploy the latest revision
+        payload = {
+            "name": self.name,
+            "revision": str(latest_revision)
+        }
+        response = self._make_env_request('post', f'deployments', data=payload)
+        
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully deployed API Proxy {self.name} to {environment}")
+            return True
+        else:
+            self.logger.error(f"Failed to deploy API Proxy {self.name} to {environment}. Status: {response.status_code if response else 'No response'}")
+            return False
+
+    def undeploy(self, environment):
+        """Undeploy the API Proxy from an environment."""
+        response = self._make_env_request('delete', f'deployments/{self.name}')
+        if response and response.status_code in [200, 204]:
+            self.logger.info(f"Successfully undeployed API Proxy {self.name} from {environment}")
+            return True
+        else:
+            self.logger.error(f"Failed to undeploy API Proxy {self.name} from {environment}. Status: {response.status_code if response else 'No response'}")
+            return False
 
     def _get_proxy_path(self):
         """Get the full path to the proxy's api_proxy directory."""
         return os.path.join(self.instance_type, 'api_proxies', self.name, 'api_proxy')
-
-    def _exists(self):
-        """Check if the proxy exists."""
-        endpoint = f"apis/{self.name}"
-        log_separator(logger, f"Checking if API proxy '{self.name}' already exists")
-        try:
-            response = self.connection.get(endpoint)
-            if response is not None:
-                logger.info(f"Found existing API proxy '{self.name}'")
-            else:
-                logger.info(f"API proxy '{self.name}' does not exist yet")
-            return response is not None
-        except Exception as e:
-            logger.error(f"Problem checking API proxy '{self.name}': {str(e)}")
-            return False
-
-    def _create(self):
-        """Create the proxy."""
-        log_separator(logger, f"Creating new API proxy '{self.name}'")
-        try:
-            # Get the proxy path and verify it exists
-            proxy_path = self._get_proxy_path()
-            if not os.path.isdir(proxy_path):
-                logger.error(f"Proxy directory not found at {proxy_path}")
-                return None
-
-            # Zip the proxy directory
-            zip_path = self.zipper.zip_proxy(proxy_path)
-            logger.info(f"Successfully zipped proxy directory: {proxy_path}")
-
-            # Import the proxy
-            with open(zip_path, 'rb') as zip_file:
-                files = {'file': zip_file}
-                response = self.connection.post_file(f"apis?name={self.name}", files=files)
-
-            # Clean up the zip file
-            self.zipper.cleanup(zip_path)
-            logger.info(f"Cleaned up temporary zip file")
-
-            if response is None:
-                logger.warning(f"Could not create API proxy '{self.name}'. Will try again next time.")
-            else:
-                logger.info(f"Successfully created API proxy '{self.name}'")
-            return response
-        except Exception as e:
-            logger.error(f"Problem creating API proxy '{self.name}': {str(e)}")
-            return None
-
-    def _update(self):
-        """Update the proxy."""
-        # For Apigee, proxy import is idempotent, so we use create
-        return self._create()
 
     def _deploy(self):
         """Deploy the proxy."""

@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "envConfig": {
-    "test": {
+    "dev": {
       "targetServers": [
         {
           "name": "test-server",
@@ -11,11 +11,9 @@
           "sSLInfo": {
             "enabled": true,
             "clientAuthEnabled": "true",
-            "keyStore": "ref://test-keystore",
-            "trustStore": "ref://test-truststore",
-            "keyAlias": "test-key",
-            "ignoreValidationErrors": false,
-            "ciphers": ["TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"]
+            "keyStore": "ref://SB-Client-Keystore-Ref",
+            "keyAlias": "ews_idm_swift",
+            "ignoreValidationErrors": false
           }
         },
         {

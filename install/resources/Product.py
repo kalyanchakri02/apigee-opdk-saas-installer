@@ -1,11 +1,15 @@
 from install.setup.Connection import Connection
 from install.resources.EnvConfigResource import EnvConfigResource
 from install.setup.logger_config import setup_logger, log_separator, log_file_separator
+from install.resources.OrgResource import OrgResource
 
 logger = setup_logger('Product')
 
-class Product(EnvConfigResource):
+class Product(OrgResource):
+    """Class to manage API Products in Apigee."""
+
     def __init__(self, name: str, config: dict, connection: Connection):
+        """Initialize Product with name, configuration and connection details."""
         super().__init__(name, config, connection)
         self.name = name
         self.config = config
@@ -13,72 +17,74 @@ class Product(EnvConfigResource):
         log_file_separator(logger, f"API Product '{name}'")
         logger.info(f"Starting to set up API product '{name}'")
 
-    def exists(self) -> bool:
-        endpoint = f"apiproducts/{self.name}"
-        log_separator(logger, f"Checking if API product '{self.name}' already exists")
-        try:
-            response = self.connection.get(endpoint)
-            if response is not None:
-                logger.info(f"Found existing API product '{self.name}'")
-            else:
-                logger.info(f"API product '{self.name}' does not exist yet")
-            return response is not None
-        except Exception as e:
-            logger.error(f"Problem checking API product '{self.name}': {str(e)}")
+    def _exists(self):
+        """Check if API Product exists."""
+        response = self._make_request('get', f'apiproducts/{self.name}')
+        return response is not None and response.status_code == 200
+
+    def _create(self):
+        """Create a new API Product."""
+        payload = {
+            "name": self.name,
+            "displayName": self.config.get('displayName', self.name),
+            "description": self.config.get('description', ''),
+            "approvalType": self.config.get('approvalType', 'auto'),
+            "attributes": self.config.get('attributes', []),
+            "apiResources": self.config.get('apiResources', []),
+            "environments": self.config.get('environments', []),
+            "proxies": self.config.get('proxies', []),
+            "quota": self.config.get('quota', ''),
+            "quotaInterval": self.config.get('quotaInterval', ''),
+            "quotaTimeUnit": self.config.get('quotaTimeUnit', '')
+        }
+        response = self._make_request('post', 'apiproducts', data=payload)
+        
+        if response and response.status_code == 201:
+            self.logger.info(f"Successfully created API Product: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to create API Product {self.name}. Status: {response.status_code if response else 'No response'}")
             return False
 
-    def create(self):
-        log_separator(logger, f"Creating new API product '{self.name}'")
-        logger.info(f"Setting up API product details for '{self.name}':")
-        logger.info(f"- Display Name: {self.config.get('displayName', 'not specified')}")
-        logger.info(f"- Environments: {', '.join(self.config.get('environments', []))}")
-        logger.info(f"- Proxies: {', '.join(self.config.get('proxies', []))}")
-        logger.info(f"- Quota: {self.config.get('quota', 'not specified')} per {self.config.get('quotaTimeUnit', 'not specified')}")
+    def _update(self):
+        """Update an existing API Product."""
+        payload = {
+            "name": self.name,
+            "displayName": self.config.get('displayName', self.name),
+            "description": self.config.get('description', ''),
+            "approvalType": self.config.get('approvalType', 'auto'),
+            "attributes": self.config.get('attributes', []),
+            "apiResources": self.config.get('apiResources', []),
+            "environments": self.config.get('environments', []),
+            "proxies": self.config.get('proxies', []),
+            "quota": self.config.get('quota', ''),
+            "quotaInterval": self.config.get('quotaInterval', ''),
+            "quotaTimeUnit": self.config.get('quotaTimeUnit', '')
+        }
+        response = self._make_request('put', f'apiproducts/{self.name}', data=payload)
         
-        response = self.connection.post("apiproducts", self.config)
-        if response is None:
-            logger.warning(f"Could not create API product '{self.name}'. Will try again next time.")
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully updated API Product: {self.name}")
+            return True
         else:
-            logger.info(f"Successfully created API product '{self.name}'")
-        return response
-
-    def update(self):
-        log_separator(logger, f"Updating existing API product '{self.name}'")
-        logger.info(f"Updating API product details for '{self.name}':")
-        logger.info(f"- Display Name: {self.config.get('displayName', 'not specified')}")
-        logger.info(f"- Environments: {', '.join(self.config.get('environments', []))}")
-        logger.info(f"- Proxies: {', '.join(self.config.get('proxies', []))}")
-        logger.info(f"- Quota: {self.config.get('quota', 'not specified')} per {self.config.get('quotaTimeUnit', 'not specified')}")
-        
-        response = self.connection.put(f"apiproducts/{self.name}", self.config)
-        if response is None:
-            logger.warning(f"Could not update API product '{self.name}'. Will try again next time.")
-        else:
-            logger.info(f"Successfully updated API product '{self.name}'")
-        return response
+            self.logger.error(f"Failed to update API Product {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
 
     def apply(self):
-        log_separator(logger, f"Setting up API product '{self.name}'")
-        try:
-            if self.exists():
-                logger.info(f"API product '{self.name}' exists, updating its settings")
-                return self.update()
-            else:
-                logger.info(f"API product '{self.name}' doesn't exist, creating it new")
-                return self.create()
-        except Exception as e:
-            logger.error(f"Problem setting up API product '{self.name}': {str(e)}")
-            return None
+        """Apply the API Product configuration."""
+        if self._exists():
+            self.logger.info(f"API Product {self.name} already exists, updating")
+            return self._update()
+        else:
+            self.logger.info(f"API Product {self.name} does not exist, creating")
+            return self._create()
 
     def delete(self):
-        log_separator(logger, f"Deleting API product '{self.name}'")
-        try:
-            response = self.connection.delete(f"apiproducts/{self.name}")
-            if response is None:
-                logger.warning(f"Could not delete API product '{self.name}'. Will try again next time.")
-            else:
-                logger.info(f"Successfully deleted API product '{self.name}'")
-            return response
-        except Exception as e:
-            logger.error(f"Problem deleting API product '{self.name}': {str(e)}")
-            return None
+        """Delete the API Product."""
+        response = self._make_request('delete', f'apiproducts/{self.name}')
+        if response and response.status_code in [200, 204]:
+            self.logger.info(f"Successfully deleted API Product: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to delete API Product {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False

@@ -15,7 +15,6 @@ def test_kvm_operations():
     # Load resource configuration
     logger.debug("Loading resource configuration")
     resource_config = load_config(os.path.join(os.path.dirname(__file__), 'config.json'))
-    whitelist = load_whitelist(os.path.join(os.path.dirname(__file__), 'whitelist.yml'))
     
     try:
         # Get KVM configuration from config file

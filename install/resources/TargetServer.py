@@ -1,70 +1,68 @@
 from install.setup.Connection import Connection
-from install.resources.EnvConfigResource import EnvConfigResource
-from install.setup.logger_config import setup_logger, log_separator, log_file_separator
+from install.setup.logger_config import setup_logger, log_file_separator
+from install.resources.Resource import Resource
+import logging
 
 logger = setup_logger('TargetServer')
 
-class TargetServer(EnvConfigResource):
+class TargetServer(Resource):
+    """Class to manage Target Servers in Apigee."""
 
     def __init__(self, name: str, config: dict, connection: Connection):
+        """Initialize TargetServer with name, configuration and connection details."""
         super().__init__(name, config, connection)
         self.name = name
         self.config = config
         self.connection = connection
+        self.logger = logging.getLogger(__name__)
         log_file_separator(logger, f"Target Server '{name}'")
         logger.info(f"Starting to set up target server '{name}'")
 
-    def exists(self) -> bool:
-        endpoint = f"targetservers/{self.name}"
-        log_separator(logger, f"Checking if target server '{self.name}' already exists")
-        try:
-            response = self.connection.get(endpoint)
-            if response is not None:
-                logger.info(f"Found existing target server '{self.name}'")
-            else:
-                logger.info(f"Target server '{self.name}' does not exist yet")
-            return response is not None
-        except Exception as e:
-            logger.error(f"Problem checking target server '{self.name}': {str(e)}")
+    def _exists(self, path):
+        """Check if Target Server exists in the environment."""
+        response = self._make_request('get', path)
+        if response.status_code == 200:
+            return True
+        elif response.status_code == 404:
+            return False
+        else:
+            raise RuntimeError(f"Unexpected response status {response.status_code}: {response.text}")
+
+    def _create(self):
+        """Create a new Target Server in the environment."""
+        response = self._make_request('post', 'targetservers', data=self.config)
+        if response.status_code == 201 or response.status_code == 409:
+            self.logger.info(f"Successfully created/Target Server might have already exists: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to create Target Server {self.name}. Status: {response.status_code}")
             return False
 
-    def create(self):
-        log_separator(logger, f"Creating new target server '{self.name}'")
-        logger.info(f"Setting up connection details for '{self.name}':")
-        logger.info(f"- Host: {self.config.get('host', 'not specified')}")
-        logger.info(f"- Port: {self.config.get('port', 'not specified')}")
-        logger.info(f"- SSL Enabled: {self.config.get('sSLInfo', {}).get('enabled', 'not specified')}")
-        
-        response = self.connection.post("targetservers", self.config)
-        if response is None:
-            logger.warning(f"Could not create target server '{self.name}'. Will try again next time.")
+    def _update(self):
+        """Update an existing Target Server in the environment."""
+        response = self._make_request('put', f'targetservers/{self.name}', data=self.config)
+        if response.status_code in [200, 201]:
+            self.logger.info(f"Successfully updated Target Server: {self.name}")
+            return True
         else:
-            logger.info(f"Successfully created target server '{self.name}'")
-        return response
-
-    def update(self):
-        log_separator(logger, f"Updating existing target server '{self.name}'")
-        logger.info(f"Updating connection details for '{self.name}':")
-        logger.info(f"- Host: {self.config.get('host', 'not specified')}")
-        logger.info(f"- Port: {self.config.get('port', 'not specified')}")
-        logger.info(f"- SSL Enabled: {self.config.get('sSLInfo', {}).get('enabled', 'not specified')}")
-        
-        response = self.connection.put(f"targetservers/{self.name}", self.config)
-        if response is None:
-            logger.warning(f"Could not update target server '{self.name}'. Will try again next time.")
-        else:
-            logger.info(f"Successfully updated target server '{self.name}'")
-        return response
+            self.logger.error(f"Failed to update Target Server {self.name}. Status: {response.status_code}")
+            return False
 
     def apply(self):
-        log_separator(logger, f"Setting up target server '{self.name}'")
-        try:
-            if self.exists():
-                logger.info(f"Target server '{self.name}' exists, updating its settings")
-                return self.update()
-            else:
-                logger.info(f"Target server '{self.name}' doesn't exist, creating it new")
-                return self.create()
-        except Exception as e:
-            logger.error(f"Problem setting up target server '{self.name}': {str(e)}")
-            return None
+        """Apply the Target Server configuration."""
+        if self._exists(f'targetservers/{self.name}'):
+            self.logger.info(f"Target Server {self.name} already exists, updating")
+            return self._update()
+        else:
+            self.logger.info(f"Target Server {self.name} does not exist, creating")
+            return self._create()
+
+    def delete(self):
+        """Delete the Target Server from the environment."""
+        response = self._make_request('delete', f'targetservers/{self.name}')
+        if response.status_code in [200, 204]:
+            self.logger.info(f"Successfully deleted Target Server: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to delete Target Server {self.name}. Status: {response.status_code}")
+            return False

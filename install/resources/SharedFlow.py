@@ -1,4 +1,4 @@
-from install.resources.EnvConfigResource import EnvConfigResource
+from install.resources.DeployableResource import DeployableResource
 from install.setup.Connection import Connection
 from install.setup.Zipper import Zipper
 from install.setup.logger_config import setup_logger, log_separator, log_file_separator
@@ -6,8 +6,11 @@ import os
 
 logger = setup_logger('SharedFlow')
 
-class SharedFlow(EnvConfigResource):
+class SharedFlow(DeployableResource):
+    """Class to manage Shared Flows in Apigee."""
+
     def __init__(self, name: str, config: dict, connection: Connection, instance_type: str):
+        """Initialize SharedFlow with name, configuration and connection details."""
         super().__init__(name, config, connection)
         self.name = name
         self.config = config
@@ -18,136 +21,122 @@ class SharedFlow(EnvConfigResource):
         logger.info(f"Starting to set up shared flow '{name}'")
 
     def apply(self):
-        """Apply the shared flow configuration and handle deployment."""
-        log_separator(logger, f"Setting up shared flow '{self.name}'")
-        try:
-            if self._exists():
-                logger.info(f"Shared flow '{self.name}' exists, updating")
-                result = self._update()
-            else:
-                logger.info(f"Shared flow '{self.name}' doesn't exist, creating")
-                result = self._create()
-            
-            # Handle deployment if needed
-            if result is not None and self.config.get("deploy", False):
-                logger.info(f"Deploying shared flow '{self.name}'")
-                return self._deploy()
-            return result
-            
-        except Exception as e:
-            logger.error(f"Problem setting up shared flow '{self.name}': {str(e)}")
-            return None
+        """Apply the Shared Flow configuration."""
+        if self._exists():
+            self.logger.info(f"Shared Flow {self.name} already exists, updating")
+            return self._update()
+        else:
+            self.logger.info(f"Shared Flow {self.name} does not exist, creating")
+            return self._create()
 
     def _get_flow_path(self):
         """Get the full path to the shared flow's sharedflowbundle directory."""
         return os.path.join(self.instance_type, 'shared_flows', self.name, 'sharedflowbundle')
 
     def _exists(self):
-        """Check if the shared flow exists."""
-        endpoint = f"sharedflows/{self.name}"
-        log_separator(logger, f"Checking if shared flow '{self.name}' already exists")
-        try:
-            response = self.connection.get(endpoint)
-            if response is not None:
-                logger.info(f"Found existing shared flow '{self.name}'")
-            else:
-                logger.info(f"Shared flow '{self.name}' does not exist yet")
-            return response is not None
-        except Exception as e:
-            logger.error(f"Problem checking shared flow '{self.name}': {str(e)}")
-            return False
+        """Check if Shared Flow exists."""
+        response = self._make_request('get', f'sharedflows/{self.name}')
+        return response is not None and response.status_code == 200
 
     def _create(self):
-        """Create the shared flow."""
-        log_separator(logger, f"Creating new shared flow '{self.name}'")
-        try:
-            # Get the flow path and verify it exists
-            flow_path = self._get_flow_path()
-            if not os.path.isdir(flow_path):
-                logger.error(f"Shared flow directory not found at {flow_path}")
-                return None
+        """Create a new Shared Flow."""
+        # First, create the shared flow
+        payload = {
+            "name": self.name,
+            "description": self.config.get('description', '')
+        }
+        response = self._make_request('post', 'sharedflows', data=payload)
+        
+        if not response or response.status_code != 201:
+            self.logger.error(f"Failed to create Shared Flow {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
 
-            # Zip the flow directory
-            zip_path = self.zipper.zip_flow(flow_path)
-            logger.info(f"Successfully zipped shared flow directory: {flow_path}")
+        # Then, import the shared flow bundle
+        bundle_path = self.config.get('bundlePath')
+        if not bundle_path or not os.path.exists(bundle_path):
+            self.logger.error(f"Bundle path not found: {bundle_path}")
+            return False
 
-            # Import the flow
-            with open(zip_path, 'rb') as zip_file:
-                files = {'file': zip_file}
-                response = self.connection.post_file(f"sharedflows?name={self.name}", files=files)
+        with open(bundle_path, 'rb') as bundle:
+            files = {'file': (os.path.basename(bundle_path), bundle, 'application/zip')}
+            response = self._make_request('post_file', f'sharedflows/{self.name}/revisions/1', files=files)
 
-            # Clean up the zip file
-            self.zipper.cleanup(zip_path)
-            logger.info(f"Cleaned up temporary zip file")
-
-            if response is None:
-                logger.warning(f"Could not create shared flow '{self.name}'. Will try again next time.")
-            else:
-                logger.info(f"Successfully created shared flow '{self.name}'")
-            return response
-        except Exception as e:
-            logger.error(f"Problem creating shared flow '{self.name}': {str(e)}")
-            return None
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully created and imported Shared Flow: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to import Shared Flow bundle for {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
 
     def _update(self):
-        """Update the shared flow."""
-        # For Apigee, shared flow import is idempotent, so we use create
-        return self._create()
+        """Update an existing Shared Flow."""
+        # Import new revision
+        bundle_path = self.config.get('bundlePath')
+        if not bundle_path or not os.path.exists(bundle_path):
+            self.logger.error(f"Bundle path not found: {bundle_path}")
+            return False
 
-    def _deploy(self):
-        """Deploy the shared flow."""
-        log_separator(logger, f"Deploying shared flow '{self.name}'")
-        try:
-            # Get the latest revision
-            revisions = self.connection.get(f"sharedflows/{self.name}/revisions")
-            if not revisions:
-                logger.error(f"No revisions found for shared flow '{self.name}'")
-                return None
+        # Get current revision
+        response = self._make_request('get', f'sharedflows/{self.name}/revisions')
+        if not response or response.status_code != 200:
+            self.logger.error(f"Failed to get current revision for {self.name}")
+            return False
 
-            latest_revision = max(int(rev) for rev in revisions)
-            logger.info(f"Latest revision for shared flow '{self.name}' is {latest_revision}")
+        current_revision = len(response.json())
+        new_revision = current_revision + 1
 
-            # Deploy the latest revision
-            response = self.connection.post(f"sharedflows/{self.name}/revisions/{latest_revision}/deployments", 
-                                         {"name": self.name})
-            
-            if response is None:
-                logger.warning(f"Could not deploy shared flow '{self.name}'. Will try again next time.")
-            else:
-                logger.info(f"Successfully deployed shared flow '{self.name}'")
-            return response
-        except Exception as e:
-            logger.error(f"Problem deploying shared flow '{self.name}': {str(e)}")
-            return None
+        # Import new revision
+        with open(bundle_path, 'rb') as bundle:
+            files = {'file': (os.path.basename(bundle_path), bundle, 'application/zip')}
+            response = self._make_request('post_file', f'sharedflows/{self.name}/revisions/{new_revision}', files=files)
 
-    def _undeploy(self):
-        """Undeploy the shared flow."""
-        log_separator(logger, f"Undeploying shared flow '{self.name}'")
-        try:
-            response = self.connection.delete(f"sharedflows/{self.name}/deployments")
-            if response is None:
-                logger.warning(f"Could not undeploy shared flow '{self.name}'. Will try again next time.")
-            else:
-                logger.info(f"Successfully undeployed shared flow '{self.name}'")
-            return response
-        except Exception as e:
-            logger.error(f"Problem undeploying shared flow '{self.name}': {str(e)}")
-            return None
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully updated Shared Flow: {self.name} to revision {new_revision}")
+            return True
+        else:
+            self.logger.error(f"Failed to update Shared Flow {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
 
-    def _delete(self):
-        """Delete the shared flow."""
-        log_separator(logger, f"Deleting shared flow '{self.name}'")
-        try:
-            # First undeploy if deployed
-            self._undeploy()
-            
-            # Then delete the flow
-            response = self.connection.delete(f"sharedflows/{self.name}")
-            if response is None:
-                logger.warning(f"Could not delete shared flow '{self.name}'. Will try again next time.")
-            else:
-                logger.info(f"Successfully deleted shared flow '{self.name}'")
-            return response
-        except Exception as e:
-            logger.error(f"Problem deleting shared flow '{self.name}': {str(e)}")
-            return None 
+    def delete(self):
+        """Delete the Shared Flow."""
+        response = self._make_request('delete', f'sharedflows/{self.name}')
+        if response and response.status_code in [200, 204]:
+            self.logger.info(f"Successfully deleted Shared Flow: {self.name}")
+            return True
+        else:
+            self.logger.error(f"Failed to delete Shared Flow {self.name}. Status: {response.status_code if response else 'No response'}")
+            return False
+
+    def deploy(self, environment):
+        """Deploy the Shared Flow to an environment."""
+        # Get latest revision
+        response = self._make_request('get', f'sharedflows/{self.name}/revisions')
+        if not response or response.status_code != 200:
+            self.logger.error(f"Failed to get revisions for {self.name}")
+            return False
+
+        latest_revision = len(response.json())
+        
+        # Deploy the latest revision
+        payload = {
+            "name": self.name,
+            "revision": str(latest_revision)
+        }
+        response = self._make_env_request('post', f'deployments', data=payload)
+        
+        if response and response.status_code in [200, 201]:
+            self.logger.info(f"Successfully deployed Shared Flow {self.name} to {environment}")
+            return True
+        else:
+            self.logger.error(f"Failed to deploy Shared Flow {self.name} to {environment}. Status: {response.status_code if response else 'No response'}")
+            return False
+
+    def undeploy(self, environment):
+        """Undeploy the Shared Flow from an environment."""
+        response = self._make_env_request('delete', f'deployments/{self.name}')
+        if response and response.status_code in [200, 204]:
+            self.logger.info(f"Successfully undeployed Shared Flow {self.name} from {environment}")
+            return True
+        else:
+            self.logger.error(f"Failed to undeploy Shared Flow {self.name} from {environment}. Status: {response.status_code if response else 'No response'}")
+            return False 
