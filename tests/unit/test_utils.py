@@ -1,5 +1,5 @@
 import getpass
-from install.setup.Connection import Connection
+from install.setup.Connection import OrgConnection, EnvConnection
 import json
 import yaml
 import base64
@@ -27,21 +27,29 @@ def get_test_config():
         "auth_header": auth_header
     }
 
-def get_test_connection(config):
-    """Create a test connection from config."""
-    return Connection(
+def get_test_org_connection(config):
+    """Create a test organization-level connection from config."""
+    return OrgConnection(
+        org=config["org"],
+        host=config["host"],
+        auth_header=config["auth_header"]
+    )
+
+def get_test_env_connection(config):
+    """Create a test environment-level connection from config."""
+    return EnvConnection(
         org=config["org"],
         host=config["host"],
         env=config["env"],
         auth_header=config["auth_header"]
     )
 
-def load_config(config_path):
+def load_config(file_path):
     """Load configuration from a JSON file."""
-    with open(config_path, 'r') as f:
+    with open(file_path, 'r') as f:
         return json.load(f)
 
-def load_whitelist(whitelist_path):
-    """Load whitelist from a YAML file."""
-    with open(whitelist_path, 'r') as f:
+def load_whitelist(file_path):
+    """Load whitelist configuration from a YAML file."""
+    with open(file_path, 'r') as f:
         return yaml.safe_load(f) 

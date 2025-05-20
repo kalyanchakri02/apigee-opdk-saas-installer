@@ -1,141 +1,230 @@
 # core/connection.py
 import requests
-from install.setup.logger_config import setup_logger, log_separator
+from install.setup.logger_config import setup_logger
 from install.setup.URLFactory import URLFactory
+from abc import ABC, abstractmethod
 
 logger = setup_logger('Connection')
 
-class Connection:
-    def __init__(self, org, host, env, auth_header):
+class BaseConnection(ABC):
+    """Base class for all Apigee connections."""
+    
+    def __init__(self, org: str, host: str, auth_header: str):
         """
-        Initializes the connection with required parameters.
-        :param org: Apigee organization name.
-        :param env: Apigee environment name.
-        :param auth_header: Complete authorization header (e.g. "Basic base64encoded" or "Bearer token")
+        Initialize the base connection.
+        
+        Args:
+            org: Apigee organization name
+            host: Apigee host
+            auth_header: Authorization header
         """
         self.org = org
-        self.env = env
         self.host = host
-        
-        # Create URL builders for different API levels
-        self.url_factory = URLFactory()
-        self.org_url_builder = self.url_factory.create_builder('org', host, org)
-        self.env_url_builder = self.url_factory.create_builder('env', host, org, env)
-        self.api_url_builder = self.url_factory.create_builder('api', host, org)
-        
-        # Headers for API requests
         self.headers = {
-            "Authorization": auth_header,
-            "Content-Type": "application/json"
+            "Authorization": auth_header
         }
-        
+        self.url_factory = URLFactory()
         logger.info(f"Setting up connection to Apigee:")
         logger.info(f"- Organization: {org}")
-        logger.info(f"- Environment: {env}")
         logger.info(f"- Host: {host}")
 
-    def get(self, endpoint, level='env'):
+    def get(self, endpoint: str, content_type: str = 'application/json') -> requests.Response:
         """
-        Perform a GET request to the given endpoint.
-        :param endpoint: The API endpoint to send the request to.
-        :param level: API level ('org', 'env', or 'api')
-        :return: Response from the API.
+        Perform a GET request.
+        
+        Args:
+            endpoint: API endpoint
+            content_type: Content type header (default: application/json)
+            
+        Returns:
+            Response from the API
         """
-        url = self._build_url(endpoint, level)
+        url = self._build_url(endpoint)
+        headers = self._get_headers(content_type)
         logger.info(f"GET request to {url}")
-        response = requests.get(url, headers=self.headers)
+        response = requests.get(url, headers=headers)
         self._log_response(response)
         return response
 
-    def post(self, endpoint, data, level='env'):
+    def post(self, endpoint: str, data: dict = None, content_type: str = 'application/json') -> requests.Response:
         """
-        Perform a POST request to the given endpoint.
-        :param endpoint: The API endpoint to send the request to.
-        :param data: The data to send in the body of the POST request.
-        :param level: API level ('org', 'env', or 'api')
-        :return: Response from the API.
+        Perform a POST request.
+        
+        Args:
+            endpoint: API endpoint
+            data: Request data
+            content_type: Content type header (default: application/json)
+            
+        Returns:
+            Response from the API
         """
-        url = self._build_url(endpoint, level)
+        url = self._build_url(endpoint)
+        headers = self._get_headers(content_type)
         logger.info(f"POST request to {url}")
-        response = requests.post(url, headers=self.headers, json=data)
+        response = requests.post(url, headers=headers, json=data)
         self._log_response(response)
         return response
     
-    def post_file(self, endpoint, files, level='env'):
+    def post_file(self, endpoint: str, files: dict, content_type: str = None) -> requests.Response:
         """
-        Perform a POST request with file upload to the given endpoint.
-        :param endpoint: The API endpoint to send the request to.
-        :param files: Dictionary of files to upload.
-        :param level: API level ('org', 'env', or 'api')
-        :return: Response from the API.
+        Perform a POST request with file upload.
+        
+        Args:
+            endpoint: API endpoint
+            files: Files to upload
+            content_type: Content type header (default: None for multipart/form-data)
+            
+        Returns:
+            Response from the API
         """
-        url = self._build_url(endpoint, level)
+        url = self._build_url(endpoint)
+        headers = self._get_headers(content_type)
         logger.info(f"POST file request to {url}")
-        headers = self.headers.copy()
-        headers.pop("Content-Type", None)
         response = requests.post(url, headers=headers, files=files)
         self._log_response(response)
         return response
 
-    def put(self, endpoint, data, level='env'):
+    def put(self, endpoint: str, data: dict = None, content_type: str = 'application/json') -> requests.Response:
         """
-        Perform a PUT request to the given endpoint.
-        :param endpoint: The API endpoint to send the request to.
-        :param data: The data to send in the body of the PUT request.
-        :param level: API level ('org', 'env', or 'api')
-        :return: Response from the API.
+        Perform a PUT request.
+        
+        Args:
+            endpoint: API endpoint
+            data: Request data
+            content_type: Content type header (default: application/json)
+            
+        Returns:
+            Response from the API
         """
-        url = self._build_url(endpoint, level)
+        url = self._build_url(endpoint)
+        headers = self._get_headers(content_type)
         logger.info(f"PUT request to {url}")
-        response = requests.put(url, headers=self.headers, json=data)
+        response = requests.put(url, headers=headers, json=data)
         self._log_response(response)
         return response
 
-    def delete(self, endpoint, level='env'):
+    def delete(self, endpoint: str, content_type: str = 'application/json') -> requests.Response:
         """
-        Perform a DELETE request to the given endpoint.
-        :param endpoint: The API endpoint to send the request to.
-        :param level: API level ('org', 'env', or 'api')
-        :return: Response from the API.
+        Perform a DELETE request.
+        
+        Args:
+            endpoint: API endpoint
+            content_type: Content type header (default: application/json)
+            
+        Returns:
+            Response from the API
         """
-        url = self._build_url(endpoint, level)
+        url = self._build_url(endpoint)
+        headers = self._get_headers(content_type)
         logger.info(f"DELETE request to {url}")
-        response = requests.delete(url, headers=self.headers)
+        response = requests.delete(url, headers=headers)
         self._log_response(response)
         return response
-    
-    def _build_url(self, endpoint, level):
+
+    def _get_headers(self, content_type: str = None) -> dict:
         """
-        Build a URL for the given endpoint and API level.
-        :param endpoint: The API endpoint.
-        :param level: API level ('org', 'env', or 'api')
-        :return: Complete URL string.
+        Get headers for the request.
+        
+        Args:
+            content_type: Content type header (optional)
+            
+        Returns:
+            dict: Headers for the request
         """
-        if level == 'org':
-            return self.org_url_builder.build_url(endpoint)
-        elif level == 'env':
-            return self.env_url_builder.build_url(endpoint)
-        elif level == 'api':
-            return self.api_url_builder.build_url(endpoint)
-        else:
-            raise ValueError(f"Unknown API level: {level}")
-    
-    def _log_response(self, response):
+        headers = self.headers.copy()
+        if content_type:
+            headers["Content-Type"] = content_type
+        return headers
+
+    @abstractmethod
+    def _build_url(self, endpoint: str) -> str:
+        """
+        Build the complete URL for the request.
+        
+        Args:
+            endpoint: API endpoint
+            
+        Returns:
+            Complete URL string
+        """
+        pass
+
+    def _log_response(self, response: requests.Response):
         """
         Log the response from an API request.
-        :param response: Response object from requests.
+        
+        Args:
+            response: Response object from requests
         """
         if 200 <= response.status_code < 300:
             logger.info(f"Response status: {response.status_code}")
             try:
                 if response.text:
-                    logger.debug(f"Response body: {response.text[:500]}...")
-            except Exception:
-                pass
+                    logger.debug(f"Response body: {response.text}")
+            except Exception as e:
+                logger.warning(f"Could not log response body: {str(e)}")
         else:
-            logger.error(f"Error response: {response.status_code}")
+            logger.error(f"Request failed with status {response.status_code}")
             try:
                 if response.text:
-                    logger.error(f"Error details: {response.text[:500]}...")
-            except Exception:
-                pass
+                    logger.error(f"Error response: {response.text}")
+            except Exception as e:
+                logger.warning(f"Could not log error response: {str(e)}")
+
+class OrgConnection(BaseConnection):
+    """Connection for organization-level API operations."""
+    
+    def __init__(self, org: str, host: str, auth_header: str):
+        """
+        Initialize organization-level connection.
+        
+        Args:
+            org: Apigee organization name
+            host: Apigee host
+            auth_header: Authorization header
+        """
+        super().__init__(org, host, auth_header)
+        self.org_url_builder = self.url_factory.create_builder('org', host, org)
+        logger.info("Initialized organization-level connection")
+
+    def _build_url(self, endpoint: str) -> str:
+        """
+        Build organization-level URL.
+        
+        Args:
+            endpoint: API endpoint
+            
+        Returns:
+            Complete URL string
+        """
+        return self.org_url_builder.build_url(endpoint)
+
+class EnvConnection(BaseConnection):
+    """Connection for environment-level API operations."""
+    
+    def __init__(self, org: str, host: str, env: str, auth_header: str):
+        """
+        Initialize environment-level connection.
+        
+        Args:
+            org: Apigee organization name
+            host: Apigee host
+            env: Environment name
+            auth_header: Authorization header
+        """
+        super().__init__(org, host, auth_header)
+        self.env = env
+        self.env_url_builder = self.url_factory.create_builder('env', host, org, env)
+        logger.info(f"Initialized environment-level connection for {env}")
+
+    def _build_url(self, endpoint: str) -> str:
+        """
+        Build environment-level URL.
+        
+        Args:
+            endpoint: API endpoint
+            
+        Returns:
+            Complete URL string
+        """
+        return self.env_url_builder.build_url(endpoint)

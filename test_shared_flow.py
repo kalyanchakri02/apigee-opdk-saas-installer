@@ -1,7 +1,6 @@
 import getpass
 import base64
 import argparse
-from install.setup.Connection import Connection
 from install.resources.SharedFlow import SharedFlow
 from install.WhitelistManager import WhitelistManager
 
@@ -38,11 +37,8 @@ def main():
 
     # Test shared flow operations
     for shared_flow_config in shared_flows:
-        # Create connection for environment-level operations
-        connection = Connection(args.org, args.host, args.env, encoded_credentials)
-        
         # Initialize shared flow
-        shared_flow = SharedFlow(shared_flow_config['name'], shared_flow_config, connection)
+        shared_flow = SharedFlow(shared_flow_config['name'], shared_flow_config, args.org, args.host, encoded_credentials, 'cloud')
         
         # Try operations
         print("\nTesting shared flow operations...")
@@ -50,7 +46,7 @@ def main():
         
         # If deploy is specified and true in config, deploy the shared flow
         if shared_flow_config.get('deploy', True):
-            shared_flow.deploy()
+            shared_flow.deploy([args.env])
 
 if __name__ == "__main__":
     main() 

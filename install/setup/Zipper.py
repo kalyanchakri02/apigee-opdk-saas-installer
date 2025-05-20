@@ -10,24 +10,28 @@ class Zipper:
         self.temp_dir = temp_dir
         os.makedirs(self.temp_dir, exist_ok=True)
 
-    def zip_proxy(self, proxy_path):
+    def zip_bundle(self, path, name):
         """
-        Zips the given proxy directory and stores it in the temp directory.
-        :param proxy_path: Path to the proxy directory.
+        Zips the given proxy/sharedflow directory and stores it in the temp directory.
+        :param path: Path to the proxy/sharedflow directory.
+        :param name: Name of the proxy/sharedflow.
         :return: Path to the zipped file.
         """
-        if not os.path.isdir(proxy_path):
-            raise ValueError(f"Proxy path {proxy_path} is not a directory")
+        if not os.path.isdir(path):
+            raise ValueError(f"bundle path {path} is not a directory")
 
-        proxy_name = os.path.basename(os.path.normpath(proxy_path))
-        zip_filename = f"{proxy_name}.zip"
+        zip_filename = f"{name}.zip"
         zip_path = os.path.join(self.temp_dir, zip_filename)
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk(proxy_path):
+            # Get the parent directory of the apiproxy directory
+            parent_dir = os.path.dirname(path)
+            # Walk through the apiproxy directory
+            for root, _, files in os.walk(path):
                 for file in files:
                     full_path = os.path.join(root, file)
-                    arcname = os.path.relpath(full_path, start=proxy_path)
+                    # Calculate the relative path from the apiproxy directory
+                    arcname = os.path.relpath(full_path, start=parent_dir)
                     zipf.write(full_path, arcname)
 
         return zip_path
@@ -56,7 +60,7 @@ def main():
 
     zipper = Zipper()
     try:
-        zip_path = zipper.zip_proxy(args.proxy_path)
+        zip_path = zipper.zip_bundle(args.proxy_path, os.path.basename(os.path.normpath(args.proxy_path)))
         if args.cleanup:
             zipper.cleanup(zip_path)
             print(f"Deleted zip file: {zip_path}")

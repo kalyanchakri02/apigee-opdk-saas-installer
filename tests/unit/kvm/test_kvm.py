@@ -1,5 +1,5 @@
 from install.resources.KVM import KVM
-from tests.unit.test_utils import get_test_config, get_test_connection, load_config, load_whitelist
+from tests.unit.test_utils import get_test_config, get_test_env_connection, load_config, load_whitelist
 from tests.utils.logger import logger
 import os
 
@@ -10,7 +10,6 @@ def test_kvm_operations():
     # Get test configuration
     logger.debug("Loading test configuration")
     config = get_test_config()
-    connection = get_test_connection(config)
     
     # Load resource configuration
     logger.debug("Loading resource configuration")
@@ -19,12 +18,12 @@ def test_kvm_operations():
     try:
         # Get KVM configuration from config file
         kvm_config = resource_config["envConfig"][config["env"]]["kvms"][0]
-        kvm = KVM(kvm_config["name"], kvm_config, connection)
+        kvm = KVM(kvm_config["name"], kvm_config, config["org"], config["host"], config["auth_header"])
         logger.info(f"KVM initialization successful: {kvm.name}")
         
         # Test KVM apply (should create since it doesn't exist)
         logger.debug("Testing KVM creation")
-        assert kvm.apply() is True
+        assert kvm.apply(config["env"]) is True
         logger.info("KVM apply (create) handled correctly")
         
         # Test KVM apply with updates
@@ -33,7 +32,7 @@ def test_kvm_operations():
             "key1": "new_value1",
             "key3": "value3"
         }
-        assert kvm.apply() is True
+        assert kvm.apply(config["env"]) is True
         logger.info("KVM apply (update) handled correctly")
         
         logger.info("All KVM tests passed!")

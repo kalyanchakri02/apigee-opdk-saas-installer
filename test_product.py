@@ -1,7 +1,6 @@
 import getpass
 import base64
 import argparse
-from install.setup.Connection import Connection
 from install.resources.Product import Product
 from install.WhitelistManager import WhitelistManager
 
@@ -37,11 +36,8 @@ def main():
 
     # Test product operations
     for product_config in products:
-        # Create connection for org-level operations (no environment needed)
-        connection = Connection(args.org, args.host, None, encoded_credentials)
-        
         # Initialize product
-        product = Product(product_config['name'], product_config, connection)
+        product = Product(product_config['name'], product_config, args.org, args.host, encoded_credentials)
         
         # Try operations
         print("\nTesting product operations...")
