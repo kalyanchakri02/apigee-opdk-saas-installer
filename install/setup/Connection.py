@@ -42,7 +42,7 @@ class BaseConnection(ABC):
         url = self._build_url(endpoint)
         headers = self._get_headers(content_type)
         logger.info(f"GET request to {url}")
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, verify=False)
         self._log_response(response)
         return response
 
@@ -61,7 +61,7 @@ class BaseConnection(ABC):
         url = self._build_url(endpoint)
         headers = self._get_headers(content_type)
         logger.info(f"POST request to {url}")
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=data, verify=False)
         self._log_response(response)
         return response
     
@@ -80,7 +80,7 @@ class BaseConnection(ABC):
         url = self._build_url(endpoint)
         headers = self._get_headers(content_type)
         logger.info(f"POST file request to {url}")
-        response = requests.post(url, headers=headers, files=files)
+        response = requests.post(url, headers=headers, files=files, verify=False)
         self._log_response(response)
         return response
 
@@ -99,7 +99,7 @@ class BaseConnection(ABC):
         url = self._build_url(endpoint)
         headers = self._get_headers(content_type)
         logger.info(f"PUT request to {url}")
-        response = requests.put(url, headers=headers, json=data)
+        response = requests.put(url, headers=headers, json=data, verify=False)
         self._log_response(response)
         return response
 
@@ -117,7 +117,7 @@ class BaseConnection(ABC):
         url = self._build_url(endpoint)
         headers = self._get_headers(content_type)
         logger.info(f"DELETE request to {url}")
-        response = requests.delete(url, headers=headers)
+        response = requests.delete(url, headers=headers, verify=False)
         self._log_response(response)
         return response
 
