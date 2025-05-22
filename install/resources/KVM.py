@@ -1,4 +1,3 @@
-import json
 from typing import Dict
 from install.resources.Resource import Resource
 from install.setup.Connection import EnvConnection
@@ -28,8 +27,17 @@ class KVM(Resource):
         self.host = host
         self.auth_header = auth_header
         self.instance_type = instance_type.lower()
+        self.is_encrypted = config.get('encrypted', False)
         logger.info(f"Initializing KVM: {name}")
-        logger.debug(f"KVM config: {json.dumps(config, indent=2)}")
+        logger.debug(f"KVM config: {self._get_safe_config()}")
+
+    def _get_safe_config(self) -> Dict:
+        """Get a safe version of the config for logging."""
+        safe_config = self.config.copy()
+        if self.is_encrypted and 'entry' in safe_config:
+            safe_config['entry'] = [{'name': entry['name'], 'value': '***REDACTED***'} 
+                                  for entry in safe_config['entry']]
+        return safe_config
 
     def _get_env_connection(self, env: str) -> EnvConnection:
         """
@@ -60,7 +68,7 @@ class KVM(Resource):
         conn = self._get_env_connection(env)
         data = {
             "name": self.name,
-            "encrypted": self.config.get('encrypted', False)
+            "encrypted": self.is_encrypted
         }
         response = conn.post(f"keyvaluemaps", data)
         if response.status_code not in [200, 201, 409]:
