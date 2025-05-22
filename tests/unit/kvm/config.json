@@ -6,20 +6,30 @@
         {
           "name": "test-kvm",
           "encrypted": true,
-          "entries": {
-            "key1": "value1",
-            "key2": "value2",
-            "api_key": "secret123"
-          }
+          "entry": [
+            {
+              "name": "key1",
+              "value": "value1"
+            },
+            {
+              "name": "key2",
+              "value": "value2"
+            }
+          ]
         },
         {
           "name": "config-kvm",
           "encrypted": false,
-          "entries": {
-            "timeout": "30",
-            "max_retries": "3",
-            "base_url": "https://api.example.com"
-          }
+          "entry":[
+            {
+              "name": "key1",
+              "value": "value1"
+            },
+            {
+              "name": "key2",
+              "value": "value2"
+            }
+          ]
         }
       ]
     }

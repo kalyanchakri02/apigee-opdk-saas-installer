@@ -52,7 +52,13 @@ class WhitelistManager:
     def get_whitelisted_kvms(self, instance: str, env: str):
         """Get whitelisted KVMs for the specified environment."""
         whitelisted = self._get_env_config(instance, env).get('kvms', [])
-        return [k for k in whitelisted if k.get('name')]
+        resource_kvms = self._get_resource_env_config(instance, env).get('kvms', [])
+        
+        # Create a map of whitelisted KVM names to their configs
+        whitelisted_map = {k['name']: k for k in whitelisted if k.get('name')}
+        
+        # Return KVMs that are in both whitelist and resources
+        return [kvm for kvm in resource_kvms if kvm.get('name') in whitelisted_map]
 
     def get_whitelisted_target_servers(self, instance: str, env: str):
         """Get whitelisted target servers for the specified environment."""

@@ -1,4 +1,5 @@
 import logging
+import logging.config
 from pathlib import Path
 
 def get_project_root():
@@ -14,42 +15,18 @@ def get_project_root():
 
 def setup_logging():
     """Set up logging configuration for tests"""
-    # Create logger
-    logger = logging.getLogger('testLogger')
-    logger.setLevel(logging.DEBUG)
-
-    # Prevent adding handlers multiple times
-    if logger.handlers:
-        return logger
-
-    # Create logs directory in project root
+    # Get project root and create logs directory
     project_root = get_project_root()
     log_dir = project_root / 'logs'
     log_dir.mkdir(exist_ok=True)
 
-    # Create formatters
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    # Load logging configuration
+    config_path = project_root / 'tests' / 'config' / 'logging.conf'
+    logging.config.fileConfig(str(config_path))
 
-    # Create handlers
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-
-    # File handler
-    log_file = log_dir / 'tests.log'
-    file_handler = logging.FileHandler(str(log_file))
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-
-    # Add handlers to logger
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
-    logger.info(f"Logging initialized. Log file: {log_file}")
+    # Get the test logger
+    logger = logging.getLogger('testLogger')
+    logger.info(f"Test logging initialized. Log file: {log_dir / 'tests.log'}")
     return logger
 
 # Create a logger instance that can be imported by test files
