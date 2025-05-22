@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List
+from typing import Dict
 from install.resources.Resource import Resource
 from install.setup.Connection import EnvConnection
 from install.setup.logger_config import setup_logger
@@ -52,7 +52,7 @@ class KVM(Resource):
     def _exists(self, env: str) -> bool:
         """Check if KVM exists in the environment."""
         conn = self._get_env_connection(env)
-        response = conn.get(f"/environments/{env}/keyvaluemaps/{self.name}")
+        response = conn.get(f"keyvaluemaps/{self.name}")
         return response.status_code == 200
 
     def _create(self, env: str):
@@ -62,7 +62,7 @@ class KVM(Resource):
             "name": self.name,
             "encrypted": self.config.get('encrypted', False)
         }
-        response = conn.post(f"/environments/{env}/keyvaluemaps", data)
+        response = conn.post(f"keyvaluemaps", data)
         if response.status_code not in [200, 201, 409]:
             logger.error(f"Failed to create KVM: {response.text}")
             raise Exception(f"Failed to create KVM: {response.text}")
@@ -79,26 +79,12 @@ class KVM(Resource):
 
     def _update_entries_saas(self, conn: EnvConnection, env: str):
         """Update KVM entries one by one for SaaS instance."""
-        # Get existing entries
-        response = conn.get(f"/environments/{env}/keyvaluemaps/{self.name}/entries")
-        if response.status_code != 200:
-            logger.error(f"Failed to get KVM entries: {response.text}")
-            raise Exception(f"Failed to get KVM entries: {response.text}")
-        
-        existing_entries = {entry['name']: entry['value'] for entry in response.json()}
-        
-        # Update entries one by one
         entries = self.config.get('entry', [])
         for entry in entries:
             name = entry['name']
             value = entry['value']
-            
-            if name in existing_entries and existing_entries[name] == value:
-                logger.debug(f"Entry {name} unchanged, skipping")
-                continue
-                
             data = {"name": name, "value": value}
-            response = conn.post(f"/environments/{env}/keyvaluemaps/{self.name}/entries", data)
+            response = conn.post(f"keyvaluemaps/{self.name}/entries/{name}", data)
             if response.status_code not in [200, 201]:
                 logger.error(f"Failed to update KVM entry {name}: {response.text}")
                 raise Exception(f"Failed to update KVM entry {name}: {response.text}")
@@ -107,22 +93,13 @@ class KVM(Resource):
     def _update_entries_onprem(self, conn: EnvConnection, env: str):
         """Update entire KVM payload for on-prem instance."""
         # Get existing entries
-        response = conn.get(f"/environments/{env}/keyvaluemaps/{self.name}/entries")
+        response = conn.get(f"keyvaluemaps/{self.name}/entries")
         if response.status_code != 200:
             logger.error(f"Failed to get KVM entries: {response.text}")
             raise Exception(f"Failed to get KVM entries: {response.text}")
         
-        existing_entries = {entry['name']: entry['value'] for entry in response.json()}
-        
-        # Prepare complete KVM payload
-        data = {
-            "name": self.name,
-            "encrypted": self.config.get('encrypted', False),
-            "entry": self.config.get('entry', [])
-        }
-        
         # Update entire KVM
-        response = conn.put(f"/environments/{env}/keyvaluemaps/{self.name}", data)
+        response = conn.put(f"keyvaluemaps/{self.name}", self.config)
         if response.status_code not in [200, 201]:
             logger.error(f"Failed to update KVM: {response.text}")
             raise Exception(f"Failed to update KVM: {response.text}")
@@ -148,6 +125,7 @@ class KVM(Resource):
             logger.info(f"Updating KVM entries for {self.name}")
             self._update_entries(env)
             logger.info(f"Successfully applied KVM {self.name} to environment: {env}")
+            return True
             
         except Exception as e:
             logger.error(f"Failed to apply KVM {self.name}: {str(e)}")

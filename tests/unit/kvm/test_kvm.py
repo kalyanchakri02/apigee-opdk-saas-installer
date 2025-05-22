@@ -1,5 +1,5 @@
 from install.resources.KVM import KVM
-from tests.unit.test_utils import get_test_config, get_test_env_connection, load_config, load_whitelist
+from tests.unit.test_utils import get_test_config, load_config
 from tests.utils.logger import logger
 import os
 
@@ -18,7 +18,7 @@ def test_kvm_operations():
     try:
         # Get KVM configuration from config file
         kvm_config = resource_config["envConfig"][config["env"]]["kvms"][0]
-        kvm = KVM(kvm_config["name"], kvm_config, config["org"], config["host"], config["auth_header"])
+        kvm = KVM(kvm_config["name"], kvm_config, config["org"], config["host"], config["auth_header"], "saas")
         logger.info(f"KVM initialization successful: {kvm.name}")
         
         # Test KVM apply (should create since it doesn't exist)
