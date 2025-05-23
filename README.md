@@ -66,28 +66,92 @@ apigee-opdk-saas-installer/
 ### Resource Configuration (resource.json)
 ```json
 {
-  "KVM": [
-    {
-      "name": "example-kvm",
-      "encrypted": true,
-      "entry": [
+  "version": "1.0",
+  "envConfig": {
+    "pilot": {
+      "targetServers": [
+      ],
+      "sharedFlows": [
         {
-          "name": "key1",
-          "value": "value1"
+          "name": "SF-ErrorManagement"
+        }
+      ],
+      "kvms": [],
+      "flowHooks": [],
+      "caches": []
+    },
+    "dev": {
+      "targetServers": [
+      ],
+      "sharedFlows": [
+        {
+          "name": "SF-ErrorManagement"
+        }
+      ],
+      "kvms": [
+        {
+          "name": "config-kvm",
+          "entry": [
+            {
+              "name": "key1",
+              "value": "value1"
+            }
+          ]
+        }
+      ],
+      "flowHooks": [],
+      "caches": [],
+      "references": [
+        {
+          "name": "test-reference",
+          "refers":"apigwy-bridge",
+          "resourceType":"KeyStore"
         }
       ]
+    },
+    "live": {
+      "targetServers": [],
+      "sharedFlows": [],
+      "kvms": [],
+      "flowHooks": [],
+      "caches": []
     }
-  ],
-  "Product": [
-    {
-      "name": "example-product",
-      "displayName": "Example Product",
-      "description": "Example API Product",
-      "apiResources": ["/example/**"],
-      "environments": ["test", "prod"]
+  },
+  "orgConfig": {
+    "apiProducts": {
+      "test-product": {
+        "name": "test-product",
+        "displayName": "Test API Product",
+        "description": "API Product for testing",
+        "approvalType": "auto",
+        "attributes": [],
+        "environments": ["dev"],
+        "proxies": ["example-api"]
+      },
+      "3skey-product": {
+        "name": "3skey-product",
+        "displayName": "3skey-product",
+        "description": "3skey-product",
+        "approvalType": "auto",
+        "attributes": [],
+        "environments": ["dev","perf"],
+        "proxies": ["oauth","swift-3skey-token-mgmt-pilot-v1","unknown-api"]
+      }
+    },
+    "developers": {
+
+    },
+    "developerApps": {
+      "test-app": {
+        "name": "test-app",
+        "displayName": "Test App",
+        "description": "App for testing",
+        "apiProducts": ["test-product"]
+      }
     }
-  ]
+  }
 }
+
 ```
 
 ### Whitelist Configuration (whitelist.yml)
