@@ -169,6 +169,7 @@ class SharedFlow(DeployableResource):
                 return False
 
             self.logger.info(f"Successfully created/updated Shared Flow: {self.name}")
+            self.zipper.cleanup(zip_path)
             
             # Deploy to all specified environments
             if not self.environments:

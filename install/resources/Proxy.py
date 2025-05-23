@@ -128,7 +128,7 @@ class Proxy(DeployableResource):
             
             # Deploy the latest revision using zero-downtime deployment
             endpoint = f'apis/{self.name}/revisions/{latest_revision}/deployments?delay=3&override=true'
-            response = env_connection.post(endpoint, data={}, content_type='application/x-www-form-urlencoded')
+            response = env_connection.post(endpoint, None, content_type='application/x-www-form-urlencoded')
             
             if response and response.status_code in [200, 201]:
                 self.logger.info(f"Successfully deployed API Proxy {self.name} revision {latest_revision} to {env}")
@@ -172,7 +172,7 @@ class Proxy(DeployableResource):
                 return False
 
             self.logger.info(f"Successfully created/updated API Proxy: {self.name}")
-            
+            self.zipper.cleanup(zip_path)
             # Deploy to all specified environments
             if not self.environments:
                 self.logger.warning(f"No environments specified for deployment of {self.name}")

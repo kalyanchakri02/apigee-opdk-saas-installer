@@ -24,9 +24,9 @@ class BaseConnection(ABC):
             "Authorization": auth_header
         }
         self.url_factory = URLFactory()
-        logger.info(f"Setting up connection to Apigee:")
-        logger.info(f"- Organization: {org}")
-        logger.info(f"- Host: {host}")
+        logger.debug(f"Setting up connection to Apigee:")
+        logger.debug(f"- Organization: {org}")
+        logger.debug(f"- Host: {host}")
 
     def get(self, endpoint: str, content_type: str = 'application/json') -> requests.Response:
         """
@@ -185,7 +185,7 @@ class OrgConnection(BaseConnection):
         """
         super().__init__(org, host, auth_header)
         self.org_url_builder = self.url_factory.create_builder('org', host, org)
-        logger.info("Initialized organization-level connection")
+        logger.debug("Initialized organization-level connection")
 
     def _build_url(self, endpoint: str) -> str:
         """

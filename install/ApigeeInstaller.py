@@ -1,8 +1,9 @@
 import os
 import base64
 import argparse
-from pathlib import Path
-from typing import Dict, List
+import getpass
+
+from typing import List
 from install.WhitelistManager import WhitelistManager
 from install.resources.Proxy import Proxy
 from install.resources.SharedFlow import SharedFlow
@@ -22,7 +23,10 @@ class ApigeeInstaller:
                  password: str,
                  org: str,
                  host: str,
-                 instance_type: str = 'onprem'):
+                 instance_type: str = 'onprem',
+                 project_root_dir: str = None,
+                 resource_file: str = None,
+                 whitelist_file: str = None):
         """
         Initialize the Apigee resource installer.
         
@@ -31,75 +35,40 @@ class ApigeeInstaller:
             password: Apigee password
             org: Apigee organization
             host: Apigee host
-            instance_type: Type of instance ('cloud' or 'onprem')
+            instance_type: Type of instance ('SaaS' or 'on-prem')
         """
         self.org = org
         self.host = host
-        self.instance_type = instance_type.lower()
+        self.instance_type = instance_type
         self.auth_header = f"Basic {base64.b64encode(f'{username}:{password}'.encode()).decode('utf-8')}"
         
         # Determine project root and config paths
-        self.project_root = self._get_project_root()
+        self.project_root = project_root_dir
         self.config_dir = self._get_config_dir()
-        self.resource_file = os.path.join(self.config_dir, 'resources.json')
-        self.whitelist_file = os.path.join(self.config_dir, 'whitelist.yaml')
-        
-        # Initialize whitelist manager
-        self.wm = WhitelistManager()
-        self.wm.load_instance('default', self.resource_file, self.whitelist_file)
-        
-        # Determine base paths
-        self.proxy_base_path = self._get_proxy_base_path()
-        self.shared_flow_base_path = self._get_shared_flow_base_path()
+        self.resource_file = self.config_dir + '/' + resource_file
+        self.whitelist_file = self.config_dir + '/' + whitelist_file
         
         logger.info(f"Initialized ApigeeInstaller for organization: {org}")
         logger.info(f"Instance type: {self.instance_type}")
         logger.info(f"Project root directory: {self.project_root}")
         logger.info(f"Config directory: {self.config_dir}")
-        logger.info(f"Resource paths:")
-        logger.info(f"- Proxy base path: {self.proxy_base_path}")
-        logger.info(f"- Shared flow base path: {self.shared_flow_base_path}")
+        logger.info(f"- Resource file: {self.resource_file}")
+        logger.info(f"- Whitelist file: {self.whitelist_file}")
+        logger.info(f"username: {username}")
 
-    def _get_project_root(self) -> str:
-        """Get the project root directory."""
-        # Start from the current file's directory
-        current_dir = Path(__file__).resolve().parent
-        # Go up until we find setup.py
-        while current_dir.parent != current_dir:  # while we haven't hit the root directory
-            if (current_dir / 'setup.py').exists():
-                return str(current_dir)
-            current_dir = current_dir.parent
-        raise FileNotFoundError("Could not find project root (no setup.py found)")
+        # Initialize whitelist manager
+        self.wm = WhitelistManager()
+        self.wm.load_instance(instance_type, self.resource_file, self.whitelist_file)
+
 
     def _get_config_dir(self) -> str:
         """Get the config directory based on instance type."""
-        config_type = 'saas' if self.instance_type == 'cloud' else 'on-prem'
+        logger.debug(f"Instance type: {self.instance_type}")
+        config_type = 'SaaS' if self.instance_type.lower() == 'saas' else 'on-prem'
         config_dir = os.path.join(self.project_root, config_type, 'config')
         if not os.path.exists(config_dir):
             raise FileNotFoundError(f"Config directory not found: {config_dir}")
         return config_dir
-
-    def _get_proxy_base_path(self) -> str:
-        """Get the base path for API proxies based on instance type."""
-        instance_dir = 'saas' if self.instance_type == 'cloud' else 'onprem'
-        return os.path.join(self.project_root, instance_dir, 'api_proxies')
-
-    def _get_shared_flow_base_path(self) -> str:
-        """Get the base path for shared flows based on instance type."""
-        instance_dir = 'saas' if self.instance_type == 'cloud' else 'onprem'
-        return os.path.join(self.project_root, instance_dir, 'shared_flows')
-
-    def _update_resource_paths(self, resources: List[Dict], base_path: str) -> List[Dict]:
-        """Update resource paths to be absolute based on the base path."""
-        if not base_path or not resources:
-            return resources
-        
-        updated_resources = []
-        for resource in resources:
-            if resource.get('path'):
-                resource['path'] = os.path.join(base_path, resource['path'])
-            updated_resources.append(resource)
-        return updated_resources
 
     def install_shared_flows(self):
         """Install all shared flows once and deploy to environments based on whitelist."""
@@ -107,6 +76,8 @@ class ApigeeInstaller:
         
         # Get all shared flows from whitelist
         shared_flows = self.wm.get_whitelisted_shared_flows(self.instance_type)
+
+        logger.info(f"shared flows: {shared_flows}")
         
         for sf_config in shared_flows:
             log_file_separator(logger, f"Shared Flow: {sf_config['name']}")
@@ -119,6 +90,7 @@ class ApigeeInstaller:
             if deploy_envs:
                 logger.info(f"Deploying shared flow to environments: {', '.join(deploy_envs)}")
                 sf.deploy(deploy_envs)
+        log_separator(logger, "Completed Installing Shared Flows")
 
     def install_proxies(self):
         """Install all proxies once and deploy to environments based on whitelist."""
@@ -126,6 +98,8 @@ class ApigeeInstaller:
         
         # Get all proxies from whitelist
         proxies = self.wm.get_whitelisted_proxies(self.instance_type)
+
+        logger.info(f"Proxies: {proxies}")
         
         for proxy_config in proxies:
             log_file_separator(logger, f"API Proxy: {proxy_config['name']}")
@@ -138,6 +112,7 @@ class ApigeeInstaller:
             if deploy_envs:
                 logger.info(f"Deploying proxy to environments: {', '.join(deploy_envs)}")
                 proxy.deploy(deploy_envs)
+        log_separator(logger, "Completed Installing API Proxies")
 
     def install_environment(self, env: str):
         """
@@ -154,6 +129,7 @@ class ApigeeInstaller:
         for kvm_config in kvms:
             kvm = KVM(kvm_config['name'], kvm_config, self.org, self.host, self.auth_header, self.instance_type)
             kvm.apply(env)
+        log_separator(logger, "Completed Installing KVMs")
 
         # 2. Install References
         log_file_separator(logger, "References")
@@ -161,6 +137,8 @@ class ApigeeInstaller:
         for reference_config in references:
             reference = Reference(reference_config['name'], reference_config, self.org, self.host, self.auth_header, env)
             reference.apply(env)
+        log_separator(logger, "Completed Installing References")
+
 
         # 3. Install Target Servers
         log_file_separator(logger, "Target Servers")
@@ -168,6 +146,7 @@ class ApigeeInstaller:
         for ts_config in target_servers:
             ts = TargetServer(ts_config['name'], ts_config, self.org, self.host, self.auth_header)
             ts.apply(env)
+        log_separator(logger, "Completed Installing Target Servers")
 
         # 4. Install Caches
         log_file_separator(logger, "Cache Resources")
@@ -175,6 +154,9 @@ class ApigeeInstaller:
         for cache_config in caches:
             cache = CacheResource(cache_config['name'], cache_config, self.org, self.host, self.auth_header)
             cache.apply(env)
+        log_separator(logger, "Completed Installing Cache Resources")
+
+        log_separator(logger, "Completed Installing Resources for Environment: {env}")
 
     def install_org_resources(self):
         """Install organization-level resources (products, developers, apps, references)."""
@@ -183,23 +165,19 @@ class ApigeeInstaller:
         # 1. Install API Products
         log_file_separator(logger, "API Products")
         products = self.wm.get_whitelisted_products(self.instance_type)
+        logger.info(f"products: {products}")
         for product_config in products:
             product = Product(product_config['name'], product_config, self.org, self.host, self.auth_header)
             product.apply()
+        log_separator(logger, "Completed Installing API Products")
 
         # 2. Install Developer Apps
         log_file_separator(logger, "Developer Apps")
-        apps = self.wm.get_whitelisted_developer_apps(self.instance_type)
-        for app_config in apps:
-            app = DeveloperApp(app_config['name'], app_config, self.org, self.host, self.auth_header)
-            app.apply()
-
-        # 3. Install organization-level references
-        log_file_separator(logger, "Organization References")
-        references = self.wm.get_whitelisted_references(self.instance_type)
-        for reference_config in references:
-            reference = Reference(reference_config['name'], reference_config, self.org, self.host, self.auth_header)
-            reference.apply()
+        # apps = self.wm.get_whitelisted_developer_apps(self.instance_type)
+        # for app_config in apps:
+        #     app = DeveloperApp(app_config['name'], app_config, self.org, self.host, self.auth_header)
+        #     app.apply()
+        log_separator(logger, "framework does not support developer apps")
 
     def install_all(self, environments: List[str]):
         """
@@ -229,36 +207,45 @@ def main():
     parser = argparse.ArgumentParser(description='Install Apigee resources based on configuration and whitelist.')
     
     # Required arguments
-    parser.add_argument('--username', required=True, help='Apigee username')
-    parser.add_argument('--password', required=True, help='Apigee password')
     parser.add_argument('--org', required=True, help='Apigee organization name')
     parser.add_argument('--host', required=True, help='Apigee host URL')
     parser.add_argument('--instance-type', required=True, choices=['SaaS', 'on-prem'],
-                      help='Type of Apigee instance (default: on-prem)')
-    
+                      help='Type of Apigee instance (SaaS or on-prem)')
+    parser.add_argument('--project-root-dir', required=True, help='Project root directory')
+    parser.add_argument('--config-file', required=True, help='resource config file')
+    parser.add_argument('--whitelist-file', required=True, help='whitelist file')
     
     args = parser.parse_args()
     
     try:
+        # Get username and password
+        username = input("Enter Apigee username: ")
+        password = getpass.getpass("Enter Apigee password: ")
+        
+        if not username or not password:
+            raise ValueError("Username and password are required")
+        
         # Initialize the installer
         installer = ApigeeInstaller(
-            username=args.username,
-            password=args.password,
+            username=username,
+            password=password,
             org=args.org,
             host=args.host,
-            instance_type=args.instance_type
+            instance_type=args.instance_type,
+            project_root_dir=args.project_root_dir,
+            resource_file=args.config_file,
+            whitelist_file=args.whitelist_file
         )
         
         # Get environments from whitelist configuration
         environments = list(installer.wm.instances[installer.instance_type]['whitelist'].get('config', {}).get('envConfig', {}).keys())
+        logger.info(f"environments found in whitelist: {', '.join(environments)}")
         if not environments:
             raise ValueError(f"No environments found in whitelist for instance type: {installer.instance_type}")
-        logger.info(f"Found environments in whitelist: {', '.join(environments)}")
+        
         
         # Install resources
         installer.install_all(environments)
-
-
         
     except Exception as e:
         logger.error(f"Installation failed: {str(e)}")

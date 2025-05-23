@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 
-def setup_logger(name: str) -> logging.Logger:
+def setup_logger(name: str,log_dir: str = './') -> logging.Logger:
     """
     Set up a logger that writes to both file and console with timestamps and separators.
     
@@ -13,7 +13,7 @@ def setup_logger(name: str) -> logging.Logger:
         logging.Logger: Configured logger instance
     """
     # Create logs directory if it doesn't exist
-    log_dir = 'logs'
+    log_dir = log_dir + '/logs'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 

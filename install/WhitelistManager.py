@@ -1,6 +1,9 @@
 import json
 import yaml
 from typing import Optional
+from install.setup.logger_config import setup_logger
+
+logger = setup_logger('WhitelistManager')
 
 class WhitelistManager:
     def __init__(self):
@@ -9,8 +12,10 @@ class WhitelistManager:
     def load_instance(self, instance_name: str, resource_path: str, whitelist_path: str):
         """Load resource and whitelist files for an instance (e.g., cloud or onprem)."""
         with open(resource_path, 'r') as rf:
+            logger.info(f"Loading resource file: {resource_path}")
             resources = json.load(rf)
         with open(whitelist_path, 'r') as wf:
+            logger.info(f"Loading whitelist file: {whitelist_path}")
             whitelist = yaml.safe_load(wf)
         self.instances[instance_name] = {
             'resources': resources,
@@ -65,6 +70,12 @@ class WhitelistManager:
         whitelisted_names = set(t['name'] for t in self._get_env_config(instance, env).get('targetServers', []) if t.get('name'))
         resource_servers = self._get_resource_env_config(instance, env).get('targetServers', [])
         return [server for server in resource_servers if server.get('name') in whitelisted_names]
+    
+    def get_whitelisted_caches(self, instance: str, env: str):
+        """Get whitelisted caches for the specified environment."""
+        whitelisted_names = set(c['name'] for c in self._get_env_config(instance, env).get('caches', []) if c.get('name'))
+        resource_caches = self._get_resource_env_config(instance, env).get('caches', [])
+        return [cache for cache in resource_caches if cache.get('name') in whitelisted_names]
 
     def get_whitelisted_products(self, instance: str):
         """Get whitelisted API products."""

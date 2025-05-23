@@ -80,23 +80,53 @@ class KVM(Resource):
         """Update KVM entries based on instance type."""
         conn = self._get_env_connection(env)
         
-        if self.instance_type == 'saas':
-            self._update_entries_saas(conn, env)
+        if self.instance_type.lower() == 'saas':
+            self._update_entries_saas(env)
         else:
             self._update_entries_onprem(conn, env)
 
-    def _update_entries_saas(self, conn: EnvConnection, env: str):
-        """Update KVM entries one by one for SaaS instance."""
-        entries = self.config.get('entry', [])
-        for entry in entries:
-            name = entry['name']
-            value = entry['value']
-            data = {"name": name, "value": value}
-            response = conn.post(f"keyvaluemaps/{self.name}/entries/{name}", data)
-            if response.status_code not in [200, 201]:
-                logger.error(f"Failed to update KVM entry {name}: {response.text}")
-                raise Exception(f"Failed to update KVM entry {name}: {response.text}")
-            logger.info(f"Updated KVM entry: {name}")
+    def _update_entries_saas(self, env: str) -> None:
+        """Update KVM entries one by one for SaaS instances."""
+        conn = self._get_env_connection(env)
+        for entry in self.config.get('entry', []):
+            key = entry.get('name')
+            value = entry.get('value')
+            if not key or not value:
+                logger.warning(f"Skipping invalid entry in KVM {self.name}: missing key or value")
+                continue
+
+            # Check if entry exists
+            url = f"keyvaluemaps/{self.name}/entries/{key}"
+            response = conn.get(url)
+            
+            if response.status_code == 404:
+                # Entry doesn't exist, create it
+                logger.info(f"Creating new entry '{key}' in KVM {self.name}")
+                create_url = f"keyvaluemaps/{self.name}/entries"
+                create_payload = {
+                    "name": key,
+                    "value": value
+                }
+                create_response = conn.post(create_url, create_payload)
+                if create_response.status_code not in [200, 201]:
+                    logger.error(f"Failed to create entry '{key}' in KVM {self.name}: {create_response.text}")
+                    continue
+                logger.info(f"Successfully created entry '{key}' in KVM {self.name}")
+            elif response.status_code == 200:
+                # Entry exists, update it
+                logger.info(f"Updating existing entry '{key}' in KVM {self.name}")
+                update_payload = {
+                    "name": key,
+                    "value": value
+                }
+                update_response = conn.post(url, update_payload)
+                if update_response.status_code != 200:
+                    logger.error(f"Failed to update entry '{key}' in KVM {self.name}: {update_response.text}")
+                    continue
+                logger.info(f"Successfully updated entry '{key}' in KVM {self.name}")
+            else:
+                logger.error(f"Failed to check entry '{key}' in KVM {self.name}: {response.text}")
+                continue
 
     def _update_entries_onprem(self, conn: EnvConnection, env: str):
         """Update entire KVM payload for on-prem instance."""
