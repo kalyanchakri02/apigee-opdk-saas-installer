@@ -215,7 +215,7 @@ class EnvConnection(BaseConnection):
         super().__init__(org, host, auth_header)
         self.env = env
         self.env_url_builder = self.url_factory.create_builder('env', host, org, env)
-        logger.info(f"Initialized environment-level connection for {env}")
+        logger.debug(f"Initialized environment-level connection for {env}")
 
     def _build_url(self, endpoint: str) -> str:
         """
