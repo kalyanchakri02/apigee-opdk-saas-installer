@@ -1,336 +1,197 @@
-# Apigee OnPrem/SaaS Installation Framework
+# Apigee OPDK/SaaS Installer
 
-A Python framework for installing and managing Apigee resources across OnPrem and SaaS environments. This framework provides a unified approach to managing API proxies, shared flows, and other Apigee resources regardless of the deployment type.
+A Python-based tool for installing and managing Apigee resources across different environments and instance types (OPDK and SaaS).
+
+## Project Structure
+
+```
+apigee-opdk-saas-installer/
+├── install/
+│   ├── config/
+│   │   ├── SaaS/
+│   │   │   └── config/
+│   │   │       ├── resource.json
+│   │   │       └── whitelist.yml
+│   │   └── on-prem/
+│   │       └── config/
+│   │           ├── resource.json
+│   │           └── whitelist.yml
+│   ├── resources/
+│   │   ├── KVM.py
+│   │   ├── Proxy.py
+│   │   ├── SharedFlow.py
+│   │   ├── Product.py
+│   │   ├── TargetServer.py
+│   │   ├── CacheResource.py
+│   │   ├── DeveloperApp.py
+│   │   └── Reference.py
+│   ├── setup/
+│   │   ├── Connection.py
+│   │   └── logger_config.py
+│   ├── ApigeeInstaller.py
+│   └── WhitelistManager.py
+├── logs/
+│   └── apigee_installer.log
+└── README.md
+```
 
 ## Features
 
-- Unified management for both OnPrem and SaaS environments
-- Support for all Apigee resources:
-  - API Proxies
-  - Shared Flows
-  - API Products
-  - Target Servers
-  - Key-Value Maps (KVMs)
-  - Caches
-  - Developer Apps
-- Environment-specific installations
-- Configuration-driven using JSON and YAML files
-- Comprehensive logging
-- Secure credential handling
+- Supports both Apigee OPDK and SaaS instances
+- Handles environment-specific and organization-level resources
+- Secure credential management using interactive input
+- Comprehensive logging with sensitive data redaction
+- Case-sensitive instance type handling
+- Automatic path resolution based on instance type
+- Whitelist-based resource management
 
-## Installation
+## Resource Types
 
-1. Clone the repository:
-```bash
-git clone https://github.com/kalyanchakri02/apigee-opdk-saas-installer
-cd apigee-opdk-saas-installer
-```
+1. **Environment-specific Resources**:
+   - Key Value Maps (KVMs)
+   - References
+   - Target Servers
+   - Cache Resources
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. **Organization-level Resources**:
+   - API Products
+   - Developer Apps
+
+3. **API Resources**:
+   - API Proxies
+   - Shared Flows
 
 ## Configuration Files
 
-The framework uses two main configuration files:
-
-1. `config.json`: Contains the resource definitions and configurations
-2. `whitelist.yml`: Defines which resources should be deployed
-
-These files should be placed in your instance-specific directory (e.g., `cloud/` or `onprem/`).
-
-### config.json Example
+### Resource Configuration (resource.json)
 ```json
 {
-  "version": "1.0",
-  "envConfig": {
-    "test": {
-      "targetServers": [
+  "KVM": [
+    {
+      "name": "example-kvm",
+      "encrypted": true,
+      "entry": [
         {
-          "name": "test-server",
-          "host": "api.test.com",
-          "port": 443,
-          "ssl": true
-        }
-      ],
-      "sharedFlows": [
-        {
-          "name": "error-handler",
-          "deploy": true
-        }
-      ],
-      "kvms": [
-        {
-          "name": "config-kvm",
-          "encrypted": true,
-          "entries": {
-            "key1": "value1",
-            "key2": "value2"
-          }
-        }
-      ],
-      "caches": [
-        {
-          "name": "response-cache",
-          "description": "Cache for API responses",
-          "timeoutInSec": 3600,
-          "maxElementsInMemory": 1000,
-          "maxElementSizeInKB": 512,
-          "overflowToDisk": true,
-          "persistent": false
+          "name": "key1",
+          "value": "value1"
         }
       ]
     }
-  },
-  "orgConfig": {
-    "apiProducts": {
-      "product-name": {
-        "name": "product-name",
-        "displayName": "Example Product",
-        "description": "Example API Product",
-        "environments": ["test"],
-        "proxies": ["example-api"],
-        "scopes": [],
-        "quota": "10000",
-        "quotaInterval": "1",
-        "quotaTimeUnit": "month"
-      }
-    },
-    "developers": {
-      "developer@example.com": {
-        "email": "developer@example.com",
-        "firstName": "Test",
-        "lastName": "Developer",
-        "userName": "testdev"
-      }
-    },
-    "developerApps": {
-      "test-app": {
-        "name": "test-app",
-        "developer": "developer@example.com",
-        "products": ["product-name"]
-      }
+  ],
+  "Product": [
+    {
+      "name": "example-product",
+      "displayName": "Example Product",
+      "description": "Example API Product",
+      "apiResources": ["/example/**"],
+      "environments": ["test", "prod"]
     }
-  }
+  ]
 }
 ```
 
-### whitelist.yml Example
+### Whitelist Configuration (whitelist.yml)
 ```yaml
 config:
   products:
-    - name: product-name
+    - name: test-product
+    - name: 3skey-product
+
   developerApps:
     - name: test-app
+  proxies:
+    - name: example-api
+      deploy:
+        - dev
+  sharedFlows:
+    - name: SF-ErrorManagement
+      deploy:
+        - dev
   envConfig:
-    test:
-      proxies:
-        - name: example-api
-          deploy: true
-      sharedFlows:
-        - name: error-handler
-          deploy: true
+    dev:
       kvms:
         - name: config-kvm
-      caches:
-        - name: response-cache
       targetServers:
-        - name: test-server
-```
-
-## Project Structure
-```
-.
-├── install/             # Main package
-│   ├── core/           # Core functionality
-│   │   ├── installer.py    # Main installer class
-│   │   ├── client.py      # Apigee API client
-│   │   └── config.py      # Configuration management
-│   └── resources/     # Resource implementations
-│       ├── proxy.py
-│       ├── shared_flow.py
-│       ├── kvm.py
-│       ├── cache.py
-│       └── ...
-├── tests/            # Tests and examples
-│   ├── unit/        # Unit tests
-│   ├── integration/ # Integration tests
-│   ├── examples/    # Example scripts
-│   └── data/        # Test data and configurations
-├── cloud/           # Cloud instance configs and resources
-│   ├── config.json
-│   ├── whitelist.yml
-│   ├── api_proxies/     # API Proxies for cloud environment
-│   │   └── ...
-│   └── shared_flows/    # Shared Flows for cloud environment
-│       └── ...
-├── onprem/          # OnPrem instance configs and resources
-│   ├── config.json
-│   ├── whitelist.yml
-│   ├── api_proxies/
-│   │   └── ...
-│   └── shared_flows/
-│       └── ...
-└── README.md
+        - name: target-server
+      references:
+        - name: test-reference
 ```
 
 ## Usage
 
-### Command Line Examples
+### Command Line Interface
 
-1. Install all resources:
 ```bash
-python tests/examples/install_all.py \
-  --username your-username \
-  --host api.enterprise.apigee.com \
+python -m install.ApigeeInstaller \
   --org your-org \
-  --environments "test,prod" \
-  --instance cloud
+  --host your-host \
+  --instance-type SaaS \
+  --project-root-dir /path/to/project \
+  --config-file resource.json \
+  --whitelist-file whitelist.yml
 ```
 
-2. Install single proxy:
-```bash
-python tests/examples/install_proxy.py \
-  --username your-username \
-  --host api.enterprise.apigee.com \
-  --org your-org \
-  --env test \
-  --proxy-name example-api \
-  --instance cloud
-```
+The script will:
+1. Prompt for Apigee username (visible)
+2. Prompt for Apigee password (hidden)
+3. Validate credentials
+4. Process resources based on whitelist configuration
 
-3. Install single shared flow:
-```bash
-python tests/examples/install_flow.py \
-  --username your-username \
-  --host api.enterprise.apigee.com \
-  --org your-org \
-  --env test \
-  --flow-name error-handler \
-  --instance cloud
-```
+### Instance Type Handling
 
-### As a Library
+- Instance type is case-sensitive: 'SaaS' or 'on-prem'
+- Configuration paths are automatically determined based on instance type
+- Resource handling varies by instance type (e.g., KVM updates)
 
-```python
-from install.ApigeeInstaller import ApigeeInstaller
+### KVM Handling
 
-# Create installer instance
-installer = ApigeeInstaller(
-    username="your-username",
-    password="your-password",
-    org="your-org",
-    host="api.enterprise.apigee.com",  # For SaaS
-    instance_type="cloud"  # or "onprem"
-)
+- **SaaS Instances**:
+  - Entries are updated individually
+  - Checks for entry existence before update
+  - Creates new entries if they don't exist
+  - Updates existing entries if found
 
-# Install resources in specific environments
-installer.install_all(["test", "prod"])
-```
+- **On-prem Instances**:
+  - Entire KVM payload is updated at once
+  - No individual entry management
 
-## Resource Types
+### Logging
 
-### Key Value Maps (KVMs)
-- Support for encrypted and unencrypted KVMs
-- Batch entry management
-- Environment-specific configurations
+- Comprehensive logging with different levels (INFO, DEBUG)
+- Sensitive data redaction for encrypted KVMs
+- Separate log files for main application and tests
+- Clear separation between different resource operations
 
-### Cache Resources
-- Configurable timeout settings
-- Memory and disk overflow settings
-- Size limits configuration
-- Persistence options
-- Environment-specific configurations
+## Development
 
-### API Proxies
-- Support for multiple environments
-- Version management
-- Deployment status tracking
+### Adding New Resources
 
-### Shared Flows
-- Reusable flow management
-- Environment-specific deployments
-- Version control
+1. Create a new resource class in `install/resources/`
+2. Inherit from the base `Resource` class
+3. Implement required methods:
+   - `_exists()`
+   - `_create()`
+   - `apply()`
 
-### API Products
-- Product bundling
-- Quota management
-- Access control
+### Testing
 
-### Developer Apps
-- Developer management
-- Product association
-- Credential management
+- Unit tests for each resource type
+- Test configuration in `tests/config/`
+- Separate logging configuration for tests
 
-## Resource Structures
+## Security
 
-### API Proxy Structure
-```
-{instance_type}/api_proxies/
-└── {proxy_name}/
-    └── api_proxy/          # Standard Apigee proxy structure
-        ├── proxies/
-        ├── policies/
-        ├── resources/
-        ├── targets/
-        └── apiproxy/
-```
+- Credentials are never stored on disk
+- Passwords are hidden during input
+- Sensitive KVM values are redacted in logs
+- Instance-specific security handling
 
-Example:
-```
-cloud/api_proxies/
-└── example-api/
-    └── api_proxy/
-        ├── proxies/
-        │   └── default.xml
-        ├── policies/
-        │   └── rate-limit.xml
-        └── apiproxy/
-            └── example-api.xml
-```
+## Error Handling
 
-### Shared Flow Structure
-```
-{instance_type}/shared_flows/
-└── {flow_name}/
-    └── sharedflowbundle/   # Standard Apigee shared flow structure
-        ├── policies/
-        ├── sharedflows/
-        └── sharedflowbundle/
-```
-
-Example:
-```
-cloud/shared_flows/
-└── error-handler/
-    └── sharedflowbundle/
-        ├── policies/
-        │   ├── raise-fault.xml
-        │   └── set-response.xml
-        ├── sharedflows/
-        │   └── default.xml
-        └── sharedflowbundle/
-            └── error-handler.xml
-```
-
-The framework will automatically:
-1. Look for proxies in `{instance_type}/api_proxies` directory
-2. Look for shared flows in `{instance_type}/shared_flows` directory
-3. Use the directory names as the resource names
-4. Zip and deploy the contents of the appropriate directories (`api_proxy` or `sharedflowbundle`)
-
-## Environment Support
-
-### SaaS
-- Uses standard Apigee SaaS endpoints
-- Supports all Apigee Edge features
-- Compatible with Apigee X/hybrid configurations
-
-### OnPrem
-- Supports custom management server URLs
-- Compatible with private cloud deployments
-- Handles OnPrem-specific configurations
+- Comprehensive error checking
+- Detailed error messages
+- Graceful failure handling
+- Resource-specific error recovery
 
 ## Contributing
 
@@ -339,41 +200,3 @@ The framework will automatically:
 3. Commit your changes
 4. Push to the branch
 5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## API Proxy Structure
-
-API proxies should follow this structure:
-```
-{instance_type}/api_proxies/
-└── {proxy_name}/
-    └── api_proxy/          # Standard Apigee proxy structure
-        ├── proxies/
-        ├── policies/
-        ├── resources/
-        ├── targets/
-        └── apiproxy/
-```
-
-For example:
-```
-cloud/api_proxies/
-└── example-api/
-    └── api_proxy/
-        ├── proxies/
-        │   └── default.xml
-        ├── policies/
-        │   └── rate-limit.xml
-        └── apiproxy/
-            └── example-api.xml
-```
-
-The framework will automatically:
-1. Look for proxies in the `{instance_type}/api_proxies` directory
-2. Use the directory name as the proxy name
-3. Zip and deploy the contents of the `api_proxy` directory
-
-The rest of the README remains unchanged. # apigee-opdk-saas-installer
