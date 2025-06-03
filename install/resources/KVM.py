@@ -39,6 +39,22 @@ class KVM(Resource):
                                   for entry in safe_config['entry']]
         return safe_config
 
+    def _get_safe_args(self, data: Dict) -> Dict:
+        """
+        Get a safe version of the data for logging by redacting sensitive values.
+        
+        Args:
+            data: Dictionary containing potentially sensitive data
+            
+        Returns:
+            Dict: Safe version of the data with sensitive values redacted
+        """
+        safe_data = data.copy()
+        if self.is_encrypted and 'entry' in safe_data:
+            safe_data['entry'] = [{'name': entry['name'], 'value': '***REDACTED***'} 
+                                for entry in safe_data['entry']]
+        return safe_data
+
     def _get_env_connection(self, env: str) -> EnvConnection:
         """
         Create a new environment-level connection.
@@ -61,6 +77,15 @@ class KVM(Resource):
         """Check if KVM exists in the environment."""
         conn = self._get_env_connection(env)
         response = conn.get(f"keyvaluemaps/{self.name}")
+        
+        # Log response with redaction if KVM is encrypted
+        if response.status_code == 200:
+            response_data = response.json()
+            safe_data = self._get_safe_args(response_data)
+            logger.info(f"KVM {self.name} exists with configuration: {safe_data}")
+        else:
+            logger.info(f"KVM {self.name} does not exist (status code: {response.status_code})")
+            
         return response.status_code == 200
 
     def _create(self, env: str):
@@ -115,8 +140,9 @@ class KVM(Resource):
             elif response.status_code == 200:
                 # Entry exists, get old value and update it
                 old_value = response.json().get('value', '')
+                safe_old_value = '***REDACTED***' if self.is_encrypted else old_value
                 logger.info(f"Updating existing entry '{key}' in KVM {self.name}")
-                logger.info(f"Old value: {old_value}")
+                logger.info(f"Old value: {safe_old_value}")
                 update_payload = {
                     "name": key,
                     "value": value
@@ -146,8 +172,9 @@ class KVM(Resource):
             old_entry = next((e for e in existing_entries if e.get('name') == key), None)
             if old_entry:
                 old_value = old_entry.get('value', '')
+                safe_old_value = '***REDACTED***' if self.is_encrypted else old_value
                 logger.info(f"Updating entry '{key}' in KVM {self.name}")
-                logger.info(f"Old value: {old_value}")
+                logger.info(f"Old value: {safe_old_value}")
             else:
                 logger.info(f"Creating new entry '{key}' in KVM {self.name}")
         
