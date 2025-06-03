@@ -113,8 +113,10 @@ class KVM(Resource):
                     continue
                 logger.info(f"Successfully created entry '{key}' in KVM {self.name}")
             elif response.status_code == 200:
-                # Entry exists, update it
+                # Entry exists, get old value and update it
+                old_value = response.json().get('value', '')
                 logger.info(f"Updating existing entry '{key}' in KVM {self.name}")
+                logger.info(f"Old value: {old_value}")
                 update_payload = {
                     "name": key,
                     "value": value
@@ -135,6 +137,19 @@ class KVM(Resource):
         if response.status_code != 200:
             logger.error(f"Failed to get KVM entries: {response.text}")
             raise Exception(f"Failed to get KVM entries: {response.text}")
+        
+        # Log old values before update
+        existing_entries = response.json()
+        for entry in self.config.get('entry', []):
+            key = entry.get('name')
+            new_value = entry.get('value')
+            old_entry = next((e for e in existing_entries if e.get('name') == key), None)
+            if old_entry:
+                old_value = old_entry.get('value', '')
+                logger.info(f"Updating entry '{key}' in KVM {self.name}")
+                logger.info(f"Old value: {old_value}")
+            else:
+                logger.info(f"Creating new entry '{key}' in KVM {self.name}")
         
         # Update entire KVM
         response = conn.put(f"keyvaluemaps/{self.name}", self.config)
