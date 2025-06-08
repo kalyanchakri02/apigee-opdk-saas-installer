@@ -1,7 +1,7 @@
 from typing import Dict
 from install.resources.Resource import Resource
 from install.setup.Connection import EnvConnection
-from install.setup.logger_config import setup_logger
+from install.setup.logger_config import setup_logger, log_deployment_status
 
 logger = setup_logger('KVM')
 
@@ -81,7 +81,7 @@ class KVM(Resource):
         # Log response with redaction if KVM is encrypted
         if response.status_code == 200:
             response_data = response.json()
-            safe_data = self._get_safe_args(response_data)
+            safe_data = self._get_safe_config()
             logger.info(f"KVM {self.name} exists with configuration: {safe_data}")
         else:
             logger.info(f"KVM {self.name} does not exist (status code: {response.status_code})")
@@ -98,8 +98,10 @@ class KVM(Resource):
         response = conn.post(f"keyvaluemaps", data)
         if response.status_code not in [200, 201, 409]:
             logger.error(f"Failed to create KVM: {response.text}")
+            log_deployment_status('KVM', self.name, env, 'FAILURE', response.text)
             raise Exception(f"Failed to create KVM: {response.text}")
         logger.info(f"Created KVM: {self.name} in environment: {env}")
+        log_deployment_status('KVM', self.name, env, 'SUCCESS', 'Created successfully')
 
     def _update_entries(self, env: str):
         """Update KVM entries based on instance type."""
@@ -113,6 +115,7 @@ class KVM(Resource):
     def _update_entries_saas(self, env: str) -> None:
         """Update KVM entries one by one for SaaS instances."""
         conn = self._get_env_connection(env)
+        success = True
         for entry in self.config.get('entry', []):
             key = entry.get('name')
             value = entry.get('value')
@@ -135,6 +138,7 @@ class KVM(Resource):
                 create_response = conn.post(create_url, create_payload)
                 if create_response.status_code not in [200, 201]:
                     logger.error(f"Failed to create entry '{key}' in KVM {self.name}: {create_response.text}")
+                    success = False
                     continue
                 logger.info(f"Successfully created entry '{key}' in KVM {self.name}")
             elif response.status_code == 200:
@@ -150,40 +154,54 @@ class KVM(Resource):
                 update_response = conn.post(url, update_payload)
                 if update_response.status_code != 200:
                     logger.error(f"Failed to update entry '{key}' in KVM {self.name}: {update_response.text}")
+                    success = False
                     continue
                 logger.info(f"Successfully updated entry '{key}' in KVM {self.name}")
             else:
                 logger.error(f"Failed to check entry '{key}' in KVM {self.name}: {response.text}")
+                success = False
                 continue
+
+        if success:
+            log_deployment_status('KVM', self.name, env, 'SUCCESS', 'All entries updated successfully')
+        else:
+            log_deployment_status('KVM', self.name, env, 'FAILURE', 'Some entries failed to update')
 
     def _update_entries_onprem(self, conn: EnvConnection, env: str):
         """Update entire KVM payload for on-prem instance."""
-        # Get existing entries
-        response = conn.get(f"keyvaluemaps/{self.name}/entries")
-        if response.status_code != 200:
-            logger.error(f"Failed to get KVM entries: {response.text}")
-            raise Exception(f"Failed to get KVM entries: {response.text}")
-        
-        # Log old values before update
-        existing_entries = response.json()
-        for entry in self.config.get('entry', []):
-            key = entry.get('name')
-            new_value = entry.get('value')
-            old_entry = next((e for e in existing_entries if e.get('name') == key), None)
-            if old_entry:
-                old_value = old_entry.get('value', '')
-                safe_old_value = '***REDACTED***' if self.is_encrypted else old_value
-                logger.info(f"Updating entry '{key}' in KVM {self.name}")
-                logger.info(f"Old value: {safe_old_value}")
-            else:
-                logger.info(f"Creating new entry '{key}' in KVM {self.name}")
-        
-        # Update entire KVM
-        response = conn.put(f"keyvaluemaps/{self.name}", self.config)
-        if response.status_code not in [200, 201]:
-            logger.error(f"Failed to update KVM: {response.text}")
-            raise Exception(f"Failed to update KVM: {response.text}")
-        logger.info(f"Updated entire KVM: {self.name}")
+        try:
+            # Get existing entries
+            response = conn.get(f"keyvaluemaps/{self.name}/entries")
+            if response.status_code != 200:
+                logger.error(f"Failed to get KVM entries: {response.text}")
+                log_deployment_status('KVM', self.name, env, 'FAILURE', response.text)
+                raise Exception(f"Failed to get KVM entries: {response.text}")
+            
+            # Log old values before update
+            existing_entries = response.json()
+            for entry in self.config.get('entry', []):
+                key = entry.get('name')
+                new_value = entry.get('value')
+                old_entry = next((e for e in existing_entries if e.get('name') == key), None)
+                if old_entry:
+                    old_value = old_entry.get('value', '')
+                    safe_old_value = '***REDACTED***' if self.is_encrypted else old_value
+                    logger.info(f"Updating entry '{key}' in KVM {self.name}")
+                    logger.info(f"Old value: {safe_old_value}")
+                else:
+                    logger.info(f"Creating new entry '{key}' in KVM {self.name}")
+            
+            # Update entire KVM
+            response = conn.put(f"keyvaluemaps/{self.name}", self.config)
+            if response.status_code not in [200, 201]:
+                logger.error(f"Failed to update KVM: {response.text}")
+                log_deployment_status('KVM', self.name, env, 'FAILURE', response.text)
+                raise Exception(f"Failed to update KVM: {response.text}")
+            logger.info(f"Updated entire KVM: {self.name}")
+            log_deployment_status('KVM', self.name, env, 'SUCCESS', 'Updated successfully')
+        except Exception as e:
+            log_deployment_status('KVM', self.name, env, 'FAILURE', str(e))
+            raise
 
     def apply(self, env: str):
         """
@@ -209,6 +227,7 @@ class KVM(Resource):
             
         except Exception as e:
             logger.error(f"Failed to apply KVM {self.name}: {str(e)}")
+            log_deployment_status('KVM', self.name, env, 'FAILURE', str(e))
             raise
 
 
