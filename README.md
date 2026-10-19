@@ -1,191 +1,35 @@
 # Apigee OPDK/SaaS Installer
 
-A Python-based tool for installing and managing Apigee resources across different environments and instance types (OPDK and SaaS).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.7%2B-blue)
 
-## Project Structure
+**Promote Apigee configuration and API artifacts between environments with one config-driven command, for both Apigee OPDK (on-prem) and SaaS.**
 
-```
-apigee-opdk-saas-installer/
-├── install/
-│   ├── config/
-│   │   ├── SaaS/
-│   │   │   └── config/
-│   │   │       ├── resource.json
-│   │   │       └── whitelist.yml
-│   │   └── on-prem/
-│   │       └── config/
-│   │           ├── resource.json
-│   │           └── whitelist.yml
-│   ├── resources/
-│   │   ├── KVM.py
-│   │   ├── Proxy.py
-│   │   ├── SharedFlow.py
-│   │   ├── Product.py
-│   │   ├── TargetServer.py
-│   │   ├── CacheResource.py
-│   │   ├── DeveloperApp.py
-│   │   └── Reference.py
-│   ├── setup/
-│   │   ├── Connection.py
-│   │   └── logger_config.py
-│   ├── ApigeeInstaller.py
-│   └── WhitelistManager.py
-├── logs/
-│   └── apigee_installer.log
-└── README.md
-```
+Moving proxies, shared flows, KVMs, target servers, caches, API products and developer apps between Apigee orgs and environments usually means a pile of ad-hoc scripts, and OPDK and SaaS behave differently (for example, KVM updates). This tool puts one declarative `resource.json` and a `whitelist.yml` in front of both, so the same workflow works on either platform and you control exactly what gets deployed.
 
-## Features
+## Why use it
 
-- Supports both Apigee OPDK and SaaS instances
-- Handles environment-specific and organization-level resources
-- Secure credential management using interactive input
-- Comprehensive logging with sensitive data redaction
-- Case-sensitive instance type handling
-- Automatic path resolution based on instance type
-- Whitelist-based resource management
+- **One tool, two platforms.** Set `--instance-type SaaS` or `on-prem`. Per-platform differences (such as KVM handling) are handled for you.
+- **Whitelist-driven.** Only resources listed in `whitelist.yml` are touched, so promotions are explicit and reviewable in a pull request.
+- **Safe by default.** Credentials are prompted for, never stored on disk. Encrypted KVM values are redacted from logs.
+- **Idempotent.** Each resource checks whether it exists, then creates or updates it.
+- **Extensible.** Adding a new resource type is one small class.
 
-## Resource Types
+## Supported resources
 
-1. **Environment-specific Resources**:
-   - Key Value Maps (KVMs)
-   - References
-   - Target Servers
-   - Cache Resources
+| Scope | Resources |
+|---|---|
+| Environment | KVMs, References, Target Servers, Caches |
+| Organization | API Products, Developer Apps |
+| API | API Proxies, Shared Flows |
 
-2. **Organization-level Resources**:
-   - API Products
-   - Developer Apps
-
-3. **API Resources**:
-   - API Proxies
-   - Shared Flows
-
-## Configuration Files
-
-### Resource Configuration (resource.json)
-```json
-{
-  "version": "1.0",
-  "envConfig": {
-    "pilot": {
-      "targetServers": [
-      ],
-      "sharedFlows": [
-        {
-          "name": "SF-ErrorManagement"
-        }
-      ],
-      "kvms": [],
-      "flowHooks": [],
-      "caches": []
-    },
-    "dev": {
-      "targetServers": [
-      ],
-      "sharedFlows": [
-        {
-          "name": "SF-ErrorManagement"
-        }
-      ],
-      "kvms": [
-        {
-          "name": "config-kvm",
-          "entry": [
-            {
-              "name": "key1",
-              "value": "value1"
-            }
-          ]
-        }
-      ],
-      "flowHooks": [],
-      "caches": [],
-      "references": [
-        {
-          "name": "test-reference",
-          "refers":"apigwy-bridge",
-          "resourceType":"KeyStore"
-        }
-      ]
-    },
-    "live": {
-      "targetServers": [],
-      "sharedFlows": [],
-      "kvms": [],
-      "flowHooks": [],
-      "caches": []
-    }
-  },
-  "orgConfig": {
-    "apiProducts": {
-      "test-product": {
-        "name": "test-product",
-        "displayName": "Test API Product",
-        "description": "API Product for testing",
-        "approvalType": "auto",
-        "attributes": [],
-        "environments": ["dev"],
-        "proxies": ["example-api"]
-      },
-      "3skey-product": {
-        "name": "3skey-product",
-        "displayName": "3skey-product",
-        "description": "3skey-product",
-        "approvalType": "auto",
-        "attributes": [],
-        "environments": ["dev","perf"],
-        "proxies": ["oauth","swift-3skey-token-mgmt-pilot-v1","unknown-api"]
-      }
-    },
-    "developers": {
-
-    },
-    "developerApps": {
-      "test-app": {
-        "name": "test-app",
-        "displayName": "Test App",
-        "description": "App for testing",
-        "apiProducts": ["test-product"]
-      }
-    }
-  }
-}
-
-```
-
-### Whitelist Configuration (whitelist.yml)
-```yaml
-config:
-  products:
-    - name: test-product
-    - name: 3skey-product
-
-  developerApps:
-    - name: test-app
-  proxies:
-    - name: example-api
-      deploy:
-        - dev
-  sharedFlows:
-    - name: SF-ErrorManagement
-      deploy:
-        - dev
-  envConfig:
-    dev:
-      kvms:
-        - name: config-kvm
-      targetServers:
-        - name: target-server
-      references:
-        - name: test-reference
-```
-
-## Usage
-
-### Command Line Interface
+## Quickstart
 
 ```bash
+git clone https://github.com/kalyanchakri02/apigee-opdk-saas-installer.git
+cd apigee-opdk-saas-installer
+pip install -r requirements.txt
+
 python -m install.ApigeeInstaller \
   --org your-org \
   --host your-host \
@@ -195,72 +39,118 @@ python -m install.ApigeeInstaller \
   --whitelist-file whitelist.yml
 ```
 
-The script will:
-1. Prompt for Apigee username (visible)
-2. Prompt for Apigee password (hidden)
-3. Validate credentials
-4. Process resources based on whitelist configuration
+Config files are resolved as `<project-root-dir>/<SaaS|on-prem>/config/<file>`, so lay out your project like this:
 
-### Instance Type Handling
+```
+my-project/
+├── SaaS/config/{resource.json, whitelist.yml}
+└── on-prem/config/{resource.json, whitelist.yml}
+```
 
-- Instance type is case-sensitive: 'SaaS' or 'on-prem'
-- Configuration paths are automatically determined based on instance type
-- Resource handling varies by instance type (e.g., KVM updates)
+You will be prompted for your Apigee username and password (hidden input). The tool then validates the credentials and processes the resources listed in the whitelist.
 
-### KVM Handling
+> `--instance-type` is case-sensitive: `SaaS` or `on-prem`. Config paths are resolved automatically from it.
 
-- **SaaS Instances**:
-  - Entries are updated individually
-  - Checks for entry existence before update
-  - Creates new entries if they don't exist
-  - Updates existing entries if found
+## How it works
 
-- **On-prem Instances**:
-  - Entire KVM payload is updated at once
-  - No individual entry management
+```
+resource.json  ──┐                       ┌── Proxy / SharedFlow
+                 ├──> ApigeeInstaller ───┼── KVM / Reference / TargetServer / Cache
+whitelist.yml  ──┘   (WhitelistManager)  └── Product / DeveloperApp
+                          │
+                  Connection (SaaS | on-prem)
+```
 
-### Logging
+1. `resource.json` describes *everything that could be deployed* per environment (`envConfig`) and org (`orgConfig`).
+2. `whitelist.yml` selects *what to deploy this run*.
+3. `ApigeeInstaller` builds the plan, and each resource class implements `_exists()`, `_create()` and `apply()`.
 
-- Comprehensive logging with different levels (INFO, DEBUG)
-- Sensitive data redaction for encrypted KVMs
-- Separate log files for main application and tests
-- Clear separation between different resource operations
+## Configuration
 
-## Development
+### `resource.json`
 
-### Adding New Resources
+```json
+{
+  "version": "1.0",
+  "envConfig": {
+    "dev": {
+      "sharedFlows": [{ "name": "SF-ErrorManagement" }],
+      "kvms": [{ "name": "config-kvm", "entry": [{ "name": "key1", "value": "value1" }] }],
+      "references": [{ "name": "test-reference", "refers": "my-keystore", "resourceType": "KeyStore" }],
+      "targetServers": [], "caches": [], "flowHooks": []
+    }
+  },
+  "orgConfig": {
+    "apiProducts": {
+      "test-product": {
+        "name": "test-product",
+        "displayName": "Test API Product",
+        "approvalType": "auto",
+        "environments": ["dev"],
+        "proxies": ["example-api"]
+      }
+    },
+    "developerApps": {
+      "test-app": { "name": "test-app", "displayName": "Test App", "apiProducts": ["test-product"] }
+    }
+  }
+}
+```
 
-1. Create a new resource class in `install/resources/`
-2. Inherit from the base `Resource` class
-3. Implement required methods:
-   - `_exists()`
-   - `_create()`
-   - `apply()`
+### `whitelist.yml`
 
-### Testing
+```yaml
+config:
+  products:
+    - name: test-product
+  developerApps:
+    - name: test-app
+  proxies:
+    - name: example-api
+      deploy: [dev]
+  sharedFlows:
+    - name: SF-ErrorManagement
+      deploy: [dev]
+  envConfig:
+    dev:
+      kvms:
+        - name: config-kvm
+```
 
-- Unit tests for each resource type
-- Test configuration in `tests/config/`
-- Separate logging configuration for tests
+## Platform differences
 
-## Security
+| Behavior | SaaS | on-prem (OPDK) |
+|---|---|---|
+| KVM updates | Per entry: checks existence, creates or updates each | Entire KVM payload replaced at once |
 
-- Credentials are never stored on disk
-- Passwords are hidden during input
-- Sensitive KVM values are redacted in logs
-- Instance-specific security handling
+## Logging and security
 
-## Error Handling
+- Logs go to a `logs/` directory (INFO and DEBUG); the folder is git-ignored. Tests use a separate log config.
+- Sensitive and encrypted KVM values are redacted.
+- Credentials are never written to disk, and the password prompt is hidden.
 
-- Comprehensive error checking
-- Detailed error messages
-- Graceful failure handling
-- Resource-specific error recovery
+## Extending
+
+1. Add a class in `install/resources/` that inherits the base `Resource` class.
+2. Implement `_exists()`, `_create()` and `apply()`.
+3. Wire it into `install/ApigeeInstaller.py` and add a sample to `resource.json`.
+
+## Tests
+
+Unit tests live in `tests/unit/` and run with `python -m pytest tests/unit/`. Some tests call a real Apigee org, so check `tests/unit/test_utils.py` and point them at a non-production org first.
+
+## Roadmap
+
+- [ ] Dry-run mode (`--dry-run`) that prints the plan without applying
+- [ ] Non-interactive auth (env vars / token) for CI pipelines
+- [ ] Flow hooks and developers support
+- [ ] Docker image and GitHub Actions example
+- [ ] Unit test coverage report
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Good first issues are labelled `good first issue`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
